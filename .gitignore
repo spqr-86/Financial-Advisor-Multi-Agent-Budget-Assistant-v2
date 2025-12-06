@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+
+# Environment
+.env
+.env.local
+
+# Credentials (NEVER commit!)
+credentials.json
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+
+# Logs & DB
+*.log
+*.db
+*.sqlite
+
+# OS
+.DS_Store
