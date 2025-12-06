@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY pyproject.toml .
+RUN pip install --no-cache-dir .
+
+# Copy source
+COPY src/mcp/ ./src/mcp/
+COPY src/core/ ./src/core/
+# Prompts и credentials понадобятся позже
+# COPY prompts/ ./prompts/
+# COPY credentials.json ./credentials.json
+
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8082
+
+EXPOSE 8082
+
+CMD ["uvicorn", "src.mcp.app:app", "--host", "0.0.0.0", "--port", "8082"]
