@@ -25,3 +25,10 @@ credentials.json
 
 # OS
 .DS_Store
+
+# macOS
+.DS_Store
+.localized
+
+# Obsidian
+.obsidian/
