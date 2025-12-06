@@ -1,39 +1,39 @@
-[project]
+[tool.poetry]
 name = "budget-assistant"
 version = "2.0.0"
 description = "Multi-Agent Budget Assistant with Telegram Bot"
-requires-python = ">=3.11"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "src"}]
 
-dependencies = [
-    # Telegram Bot
-    "aiogram>=3.4.0",
-    "aiohttp>=3.9.0",
+[tool.poetry.dependencies]
+python = "^3.11"
+# Telegram Bot
+aiogram = "^3.4.0"
+aiohttp = "^3.9.0"
+# API Server
+fastapi = "^0.109.0"
+uvicorn = {extras = ["standard"], version = "^0.27.0"}
+pydantic = "^2.5.0"
+# AI Agents (будут добавлены в Итерации 6)
+# google-adk = "^0.1.0"
+# google-generativeai = "^0.3.0"
+# Google Sheets
+gspread = "^5.12.0"
+google-auth = "^2.25.0"
+# Utilities
+python-dotenv = "^1.0.0"
+python-dateutil = "^2.8.2"
 
-    # API Server
-    "fastapi>=0.109.0",
-    "uvicorn[standard]>=0.27.0",
-    "pydantic>=2.5.0",
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-asyncio = "^0.23.0"
+ruff = "^0.1.0"
+httpx = "^0.27.0"
 
-    # AI Agents
-    "google-adk>=0.1.0",
-    "google-generativeai>=0.3.0",
-
-    # Google Sheets
-    "gspread>=5.12.0",
-    "google-auth>=2.25.0",
-
-    # Utilities
-    "python-dotenv>=1.0.0",
-    "python-dateutil>=2.8.2",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.23.0",
-    "ruff>=0.1.0",
-    "httpx>=0.27.0",
-]
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 88
