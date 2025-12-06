@@ -1,21 +1,26 @@
-"""MCP routes."""
+"""MCP service routes."""
+
+import logging
+
 from fastapi import APIRouter
-from pydantic import BaseModel
 
-router = APIRouter(prefix="/mcp")
+from src.core.schemas import QueryRequest, QueryResponse
 
+logger = logging.getLogger(__name__)
 
-class MCPQueryRequest(BaseModel):
-    query: str
-    user_id: str
+router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 
-class MCPQueryResponse(BaseModel):
-    response: str
+@router.post("/query", response_model=QueryResponse)
+async def process_mcp_query(request: QueryRequest) -> QueryResponse:
+    """Process user query through AI agent system."""
+    # TODO: Replace with agent processing in Iteration 6
+    logger.info(f"Processing query from user {request.user_id}: {request.query[:50]}")
 
+    response = f"MCP Echo: {request.query}"
 
-@router.post("/query", response_model=MCPQueryResponse)
-async def process_mcp_query(request: MCPQueryRequest):
-    """Process user query (placeholder for agent)."""
-    # TODO: Add agent processing in Iteration 6
-    return MCPQueryResponse(response=f"MCP Echo: {request.query}")
+    return QueryResponse(
+        response=response,
+        user_id=request.user_id,
+        session_id=request.session_id or request.user_id,
+    )

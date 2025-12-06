@@ -1,18 +1,33 @@
-"""API routes."""
+"""API Gateway routes."""
+
+import logging
+
 from fastapi import APIRouter
-from pydantic import BaseModel
 
-router = APIRouter(prefix="/api")
+from src.core.schemas import QueryRequest, QueryResponse
 
-class QueryRequest(BaseModel):
-    query: str
-    user_id: str
+logger = logging.getLogger(__name__)
 
-class QueryResponse(BaseModel):
-    response: str
+router = APIRouter(prefix="/api", tags=["api"])
+
 
 @router.post("/query", response_model=QueryResponse)
-async def process_query(request: QueryRequest):
-    """Process user query (placeholder, will proxy to MCP)."""
-    # TODO: Proxy to MCP in Iteration 4
-    return QueryResponse(response=f"API Echo: {request.query}")
+async def process_query(request: QueryRequest) -> QueryResponse:
+    """Proxy query to MCP service."""
+    from src.api.app import get_mcp_client
+
+    mcp_client = get_mcp_client()
+
+    result = await mcp_client.post(
+        "/mcp/query",
+        json={
+            "query": request.query,
+            "user_id": request.user_id,
+        },
+    )
+
+    return QueryResponse(
+        response=result.get("response", ""),
+        user_id=request.user_id,
+        session_id=request.session_id or request.user_id,
+    )

@@ -1,17 +1,24 @@
 """Telegram Bot - Webhook mode for Cloud Run."""
 
 import logging
-from aiohttp import web
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
 
-from src.core.config import settings
+from src.bot.config import settings
 from src.bot.handlers import router
+from src.bot.middlewares import APIClientMiddleware
+from src.core.http_client import ServiceClient
 
-logging.basicConfig(level=settings.log_level)
+logging.basicConfig(
+    level=settings.log_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
+
 
 def create_app() -> web.Application:
     """Create aiohttp application with bot webhook."""
@@ -19,19 +26,35 @@ def create_app() -> web.Application:
     # Initialize bot
     bot = Bot(
         token=settings.telegram_bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 
     # Initialize dispatcher
     dp = Dispatcher()
     dp.include_router(router)
 
+    # Setup API client middleware
+    api_client = ServiceClient(
+        base_url=settings.budget_api_url,
+        timeout=30,
+        max_retries=3,
+    )
+    dp.message.middleware(APIClientMiddleware(api_client))
+
     # Create web app
     app = web.Application()
 
+    # Store references for cleanup
+    app["bot"] = bot
+    app["api_client"] = api_client
+
     # Health check
-    async def health(request):
-        return web.json_response({"status": "healthy"})
+    async def health(request: web.Request) -> web.Response:
+        return web.json_response({
+            "status": "healthy",
+            "service": "bot",
+            "version": "2.0.0",
+        })
 
     app.router.add_get("/", health)
     app.router.add_get("/health", health)
@@ -41,10 +64,17 @@ def create_app() -> web.Application:
     SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
-        secret_token=settings.webhook_secret
+        secret_token=settings.webhook_secret,
     ).register(app, path=webhook_path)
 
     setup_application(app, dp, bot=bot)
+
+    # Cleanup on shutdown
+    async def on_shutdown(app: web.Application) -> None:
+        await app["api_client"].close()
+        await app["bot"].session.close()
+
+    app.on_shutdown.append(on_shutdown)
 
     return app
 
