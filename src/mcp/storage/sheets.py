@@ -263,6 +263,61 @@ class GoogleSheetsStorage(StorageInterface):
                 "error": str(e),
             }
 
+    async def delete_last_expense(
+        self,
+        user_id: str,
+    ) -> dict[str, Any]:
+        """Delete the last expense from Google Sheets."""
+        try:
+            worksheet = await self._get_worksheet()
+
+            # Get all rows to find the last one
+            all_values = await self._run_sync(worksheet.get, "A:D")
+
+            if not all_values or len(all_values) <= 1:
+                return {
+                    "status": "error",
+                    "error": "No expenses to delete",
+                }
+
+            # Last row number (1-indexed, including header)
+            last_row_number = len(all_values)
+            last_row_data = all_values[-1]
+
+            # Pad row if needed
+            while len(last_row_data) < 4:
+                last_row_data.append("")
+
+            deleted_expense = {
+                "Дата": last_row_data[0],
+                "Категория": last_row_data[1],
+                "Расшифровка": last_row_data[2],
+                "Сумма": last_row_data[3],
+            }
+
+            # Delete the last row
+            await self._run_sync(
+                worksheet.delete_rows,
+                last_row_number
+            )
+
+            logger.info(
+                f"Deleted last expense for user {user_id}: {deleted_expense}"
+            )
+
+            return {
+                "status": "success",
+                "user_id": user_id,
+                "deleted_expense": deleted_expense,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to delete last expense: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+            }
+
     async def health_check(self) -> dict[str, Any]:
         """Check Google Sheets connection health."""
         try:

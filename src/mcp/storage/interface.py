@@ -69,6 +69,20 @@ class StorageInterface(ABC):
         """
 
     @abstractmethod
+    async def delete_last_expense(
+        self,
+        user_id: str,
+    ) -> dict[str, Any]:
+        """Delete the last expense record.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            dict with status and deleted expense info
+        """
+
+    @abstractmethod
     async def health_check(self) -> dict[str, Any]:
         """Check storage health.
 

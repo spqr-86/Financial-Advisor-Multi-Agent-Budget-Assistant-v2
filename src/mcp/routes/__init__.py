@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 
 from src.core.schemas import (
     AddExpenseRequest,
+    DeleteLastExpenseRequest,
     GetExpensesRequest,
     GetStatisticsRequest,
     QueryRequest,
@@ -96,6 +97,21 @@ async def get_statistics(
     result = await storage.get_statistics(
         user_id=request.user_id,
         period=request.period,
+    )
+
+    return result
+
+
+@router.post("/storage/expenses/delete-last")
+async def delete_last_expense(
+    request: DeleteLastExpenseRequest,
+    storage: StorageInterface = Depends(get_storage),
+) -> dict:
+    """Delete the last expense."""
+    logger.info(f"Deleting last expense for user {request.user_id}")
+
+    result = await storage.delete_last_expense(
+        user_id=request.user_id,
     )
 
     return result

@@ -66,3 +66,9 @@ class GetStatisticsRequest(BaseModel):
 
     user_id: str = Field(..., min_length=1)
     period: str = Field(default="month", pattern="^(day|week|month|year)$")
+
+
+class DeleteLastExpenseRequest(BaseModel):
+    """Request to delete last expense."""
+
+    user_id: str = Field(..., min_length=1)
