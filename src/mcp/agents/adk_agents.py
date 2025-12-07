@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Any
 
-from google.adk.agents import Agent
+from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.runners import InMemoryRunner
 from google.adk.tools import AgentTool
@@ -33,7 +33,7 @@ retry_config = types.HttpRetryOptions(
 
 
 # Registrar Agent - specialized in adding/deleting expenses
-registrar_agent = Agent(
+registrar_agent = LlmAgent(
     name="RegistrarAgent",
     model=Gemini(
         model="gemini-2.0-flash-exp",  # Using latest experimental model
@@ -70,7 +70,7 @@ registrar_agent = Agent(
 
 
 # Analyst Agent - specialized in viewing expenses and statistics
-analyst_agent = Agent(
+analyst_agent = LlmAgent(
     name="AnalystAgent",
     model=Gemini(
         model="gemini-2.0-flash-exp",  # Using latest experimental model
@@ -101,7 +101,7 @@ analyst_agent = Agent(
 
 
 # Root Agent (LLM Orchestrator) - coordinates specialized agents
-root_agent = Agent(
+root_agent = LlmAgent(
     name="BudgetOrchestrator",
     model=Gemini(
         model="gemini-2.0-flash-exp",  # Using latest experimental model
