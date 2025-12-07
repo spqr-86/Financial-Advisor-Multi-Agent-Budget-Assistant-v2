@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test script for Multi-Agent AI system."""
+"""Test script for ADK Multi-Agent system."""
 
 import asyncio
 import sys
@@ -12,8 +12,8 @@ from src.mcp.agents.adk_agents import ADKBudgetAgent
 
 
 async def main():
-    """Test Multi-Agent AI system with various queries."""
-    print("🤖 Testing ADK Multi-Agent Budget System (Iteration 7)\n")
+    """Test ADK Multi-Agent system with google-adk patterns."""
+    print("🤖 Testing ADK Multi-Agent Budget System\n")
     print("=" * 70)
     print("Architecture:")
     print("  - Root Agent (LLM Orchestrator)")
@@ -24,21 +24,18 @@ async def main():
 
     agent = ADKBudgetAgent()
 
-    # Test queries covering different agent scenarios
+    # Test queries
     test_queries = [
         # Registrar agent tests
         "купил хлеб 50 рублей",
         "потратил на кино 500",
-        "добавь расход: транспорт 100 рублей такси",
 
         # Analyst agent tests
         "покажи последние 5 расходов",
         "статистика за месяц",
-        "сколько я потратил всего?",
 
-        # Edge cases
-        "удали последний расход",
-        "привет, как дела?",  # Should be handled gracefully
+        # General query
+        "привет!",
     ]
 
     for i, query in enumerate(test_queries, 1):

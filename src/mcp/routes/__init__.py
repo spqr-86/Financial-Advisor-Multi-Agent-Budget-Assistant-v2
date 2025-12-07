@@ -12,7 +12,7 @@ from src.core.schemas import (
     QueryRequest,
     QueryResponse,
 )
-from src.mcp.agents import SimpleBudgetAgent
+from src.mcp.agents import ADKBudgetAgent
 from src.mcp.storage import GoogleSheetsStorage, StorageInterface
 
 logger = logging.getLogger(__name__)
@@ -22,8 +22,8 @@ router = APIRouter(prefix="/mcp", tags=["mcp"])
 # Storage instance (will be initialized on first use)
 _storage: StorageInterface | None = None
 
-# AI Agent instance
-_agent: SimpleBudgetAgent | None = None
+# AI Agent instance (using ADK patterns)
+_agent: ADKBudgetAgent | None = None
 
 
 def get_storage() -> StorageInterface:
@@ -34,18 +34,18 @@ def get_storage() -> StorageInterface:
     return _storage
 
 
-def get_agent() -> SimpleBudgetAgent:
+def get_agent() -> ADKBudgetAgent:
     """Get AI agent instance (dependency injection)."""
     global _agent
     if _agent is None:
-        _agent = SimpleBudgetAgent()
+        _agent = ADKBudgetAgent()
     return _agent
 
 
 @router.post("/query", response_model=QueryResponse)
 async def process_mcp_query(
     request: QueryRequest,
-    agent: SimpleBudgetAgent = Depends(get_agent),
+    agent: ADKBudgetAgent = Depends(get_agent),
 ) -> QueryResponse:
     """Process user query through AI agent system."""
     logger.info(f"Processing query from user {request.user_id}: {request.query[:50]}")
