@@ -286,6 +286,27 @@ httpx = "^0.28.1"           # HTTP клиент для тестов
 
 ### Как протестировать локально?
 
+#### Вариант 1: С файлом .env (рекомендуется)
+
+```bash
+# 1. Создать .env файл (если еще нет)
+cp .env.example .env
+# Заполнить TELEGRAM_BOT_TOKEN и GOOGLE_API_KEY
+
+# 2. Запустить сервисы в 3 терминалах:
+
+# Терминал 1 - MCP Service
+poetry run python -m src.mcp.app
+
+# Терминал 2 - API Gateway
+poetry run python -m src.api.app
+
+# Терминал 3 - Telegram Bot (polling режим для разработки)
+poetry run python -m src.bot.run_polling
+```
+
+#### Вариант 2: С переменными окружения
+
 ```bash
 # Терминал 1 - MCP Service
 poetry run python -m src.mcp.app
@@ -294,11 +315,13 @@ poetry run python -m src.mcp.app
 export MCP_API_URL=http://localhost:8082
 poetry run python -m src.api.app
 
-# Терминал 3 - Telegram Bot
+# Терминал 3 - Telegram Bot (polling режим)
 export TELEGRAM_BOT_TOKEN=your-token
 export BUDGET_API_URL=http://localhost:8081
-poetry run python -m src.bot.app
+poetry run python -m src.bot.run_polling
 ```
+
+**Важно:** Для локальной разработки используйте `run_polling.py` (polling режим), а не `app.py` (webhook режим). Webhook работает только в продакшене с публичным URL.
 
 Затем написать боту в Telegram:
 - `/start` → получить приветствие ✅
@@ -334,10 +357,11 @@ poetry run pytest
 # Проверить код
 poetry run ruff check src/
 
-# Запустить сервис
-poetry run python -m src.mcp.app
-poetry run python -m src.api.app
-poetry run python -m src.bot.app
+# Запустить сервисы
+poetry run python -m src.mcp.app           # MCP Service (порт 8082)
+poetry run python -m src.api.app           # API Gateway (порт 8081)
+poetry run python -m src.bot.run_polling   # Bot в polling режиме (для разработки)
+poetry run python -m src.bot.app           # Bot в webhook режиме (для продакшена)
 ```
 
 ### Git

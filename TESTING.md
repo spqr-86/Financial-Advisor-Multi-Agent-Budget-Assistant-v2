@@ -94,7 +94,36 @@ tests/
 
 ### 2.1 Локальный запуск сервисов
 
-#### Вариант 1: Python напрямую (3 терминала)
+#### Вариант 1: С .env файлом (рекомендуется для разработки)
+
+**Шаг 1: Создать .env файл**
+```bash
+cp .env.example .env
+# Заполнить обязательные поля:
+# - TELEGRAM_BOT_TOKEN (из @BotFather)
+# - GOOGLE_API_KEY (для Gemini)
+```
+
+**Шаг 2: Запустить сервисы в 3 терминалах**
+
+**Терминал 1 — MCP Service (порт 8082):**
+```bash
+poetry run python -m src.mcp.app
+```
+
+**Терминал 2 — API Gateway (порт 8081):**
+```bash
+poetry run python -m src.api.app
+```
+
+**Терминал 3 — Telegram Bot (polling режим):**
+```bash
+poetry run python -m src.bot.run_polling
+```
+
+**Важно:** Используйте `src.bot.run_polling` для локальной разработки. Файл `src.bot.app` работает только в webhook режиме (для продакшена с публичным URL).
+
+#### Вариант 2: С переменными окружения
 
 **Терминал 1 — MCP Service (порт 8082):**
 ```bash
@@ -107,14 +136,14 @@ export MCP_API_URL=http://localhost:8082
 poetry run python -m src.api.app
 ```
 
-**Терминал 3 — Telegram Bot (порт 8080):**
+**Терминал 3 — Telegram Bot (polling режим):**
 ```bash
 export TELEGRAM_BOT_TOKEN=your-token
 export BUDGET_API_URL=http://localhost:8081
-poetry run python -m src.bot.app
+poetry run python -m src.bot.run_polling
 ```
 
-#### Вариант 2: Docker Compose (будет добавлено)
+#### Вариант 3: Docker Compose (будет добавлено)
 
 ```bash
 docker-compose up
