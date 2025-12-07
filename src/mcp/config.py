@@ -10,8 +10,9 @@ class MCPSettings(BaseAppSettings):
     google_api_key: str = ""
 
     # Google Sheets
-    spreadsheet_name: str = "Бюджет"
-    google_sheets_credentials: str = "credentials.json"
+    google_application_credentials: str = "./service-account.json"
+    google_sheets_spreadsheet_name: str = "Budget Assistant Data"
+    google_sheets_spreadsheet_id: str | None = None
 
     # Agent settings
     agent_timeout: int = 60
