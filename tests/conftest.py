@@ -17,9 +17,10 @@ def mock_env(monkeypatch):
 @pytest.fixture
 def mock_service_client():
     """Mock ServiceClient for testing."""
+    from unittest.mock import AsyncMock
     mock = Mock()
-    mock.post.return_value = {"response": "test response", "user_id": "123"}
-    mock.get.return_value = {"status": "healthy"}
-    mock.health_check.return_value = True
-    mock.close.return_value = None
+    mock.post = AsyncMock(return_value={"response": "test response", "user_id": "123"})
+    mock.get = AsyncMock(return_value={"status": "healthy"})
+    mock.health_check = AsyncMock(return_value=True)
+    mock.close = AsyncMock(return_value=None)
     return mock
