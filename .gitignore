@@ -11,6 +11,7 @@ venv/
 
 # Credentials (NEVER commit!)
 credentials.json
+service-account.json
 *.pem
 *.key
 
