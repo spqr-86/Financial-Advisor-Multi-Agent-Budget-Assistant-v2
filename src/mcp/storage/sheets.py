@@ -74,32 +74,21 @@ class GoogleSheetsStorage(StorageInterface):
             logger.error(f"Failed to connect to Google Sheets: {e}")
             raise
 
-    async def _get_or_create_user_worksheet(
-        self, user_id: str
-    ) -> gspread.Worksheet:
-        """Get or create user-specific worksheet."""
+    async def _get_worksheet(self) -> gspread.Worksheet:
+        """Get the main expenses worksheet."""
         await self._connect()
 
-        worksheet_name = f"User_{user_id}"
+        worksheet_name = "Траты и бюджет"
 
         try:
             worksheet = await self._run_sync(
                 self._spreadsheet.worksheet,
                 worksheet_name
             )
+            logger.info(f"Using worksheet: {worksheet_name}")
         except gspread.WorksheetNotFound:
-            logger.info(f"Creating worksheet for user {user_id}")
-            worksheet = await self._run_sync(
-                self._spreadsheet.add_worksheet,
-                title=worksheet_name,
-                rows=1000,
-                cols=5
-            )
-            # Add header row
-            await self._run_sync(
-                worksheet.append_row,
-                ["Дата", "Категория", "Описание", "Сумма", "Timestamp"]
-            )
+            logger.error(f"Worksheet '{worksheet_name}' not found!")
+            raise ValueError(f"Worksheet '{worksheet_name}' does not exist in the spreadsheet")
 
         return worksheet
 
@@ -111,17 +100,21 @@ class GoogleSheetsStorage(StorageInterface):
         description: str,
         date: datetime | None = None,
     ) -> dict[str, Any]:
-        """Add expense to Google Sheets."""
+        """Add expense to Google Sheets.
+
+        Adds to 'Траты и бюджет' worksheet with columns:
+        Дата | Категория | Расшифровка | Сумма
+        """
         try:
-            worksheet = await self._get_or_create_user_worksheet(user_id)
+            worksheet = await self._get_worksheet()
 
             expense_date = date or datetime.now()
             date_str = expense_date.strftime("%d.%m.%Y")
-            timestamp = expense_date.isoformat()
 
+            # Append row: Дата, Категория, Расшифровка, Сумма
             await self._run_sync(
                 worksheet.append_row,
-                [date_str, category, description, amount, timestamp]
+                [date_str, category, description, amount]
             )
 
             logger.info(
@@ -154,42 +147,51 @@ class GoogleSheetsStorage(StorageInterface):
     ) -> dict[str, Any]:
         """Get expenses from Google Sheets."""
         try:
-            worksheet = await self._get_or_create_user_worksheet(user_id)
+            worksheet = await self._get_worksheet()
 
-            # Get all records
-            records = await self._run_sync(worksheet.get_all_records)
+            # Get only first 4 columns (A:D) to avoid conflicts with other tables
+            # Columns: Дата, Категория, Расшифровка, Сумма
+            all_values = await self._run_sync(worksheet.get, "A:D")
 
-            # Filter records
-            filtered = records
+            if not all_values or len(all_values) < 2:
+                return {
+                    "status": "success",
+                    "user_id": user_id,
+                    "expenses": [],
+                    "count": 0,
+                }
 
-            if start_date:
-                filtered = [
-                    r for r in filtered
-                    if datetime.fromisoformat(r.get("Timestamp", ""))
-                    >= start_date
-                ]
+            # First row is headers, rest are data
+            headers = all_values[0]
+            rows = all_values[1:]
 
-            if end_date:
-                filtered = [
-                    r for r in filtered
-                    if datetime.fromisoformat(r.get("Timestamp", ""))
-                    <= end_date
-                ]
+            # Convert to list of dicts
+            records = []
+            for row in rows:
+                # Pad row if needed
+                while len(row) < 4:
+                    row.append("")
 
+                record = {
+                    "Дата": row[0],
+                    "Категория": row[1],
+                    "Расшифровка": row[2],
+                    "Сумма": row[3],
+                }
+                records.append(record)
+
+            # Filter by category if needed
             if category:
-                filtered = [
-                    r for r in filtered
-                    if r.get("Категория") == category
-                ]
+                records = [r for r in records if r.get("Категория") == category]
 
-            # Apply limit
-            filtered = filtered[:limit]
+            # Apply limit (get last N records)
+            records = records[-limit:] if len(records) > limit else records
 
             return {
                 "status": "success",
                 "user_id": user_id,
-                "expenses": filtered,
-                "count": len(filtered),
+                "expenses": records,
+                "count": len(records),
             }
 
         except Exception as e:
@@ -208,16 +210,37 @@ class GoogleSheetsStorage(StorageInterface):
     ) -> dict[str, Any]:
         """Get expense statistics from Google Sheets."""
         try:
-            worksheet = await self._get_or_create_user_worksheet(user_id)
-            records = await self._run_sync(worksheet.get_all_records)
+            worksheet = await self._get_worksheet()
+
+            # Get only first 4 columns (A:D)
+            all_values = await self._run_sync(worksheet.get, "A:D")
+
+            if not all_values or len(all_values) < 2:
+                return {
+                    "status": "success",
+                    "user_id": user_id,
+                    "period": period,
+                    "total": 0.0,
+                    "by_category": {},
+                    "categories_count": 0,
+                }
+
+            # Skip header row
+            rows = all_values[1:]
 
             # Calculate statistics by category
             stats_by_category: dict[str, float] = {}
             total = 0.0
 
-            for record in records:
-                category = record.get("Категория", "Unknown")
-                amount = float(record.get("Сумма", 0))
+            for row in rows:
+                if len(row) < 4:
+                    continue
+
+                category = row[1] if len(row) > 1 else "Unknown"
+                try:
+                    amount = float(row[3]) if len(row) > 3 else 0.0
+                except (ValueError, TypeError):
+                    amount = 0.0
 
                 stats_by_category[category] = (
                     stats_by_category.get(category, 0) + amount
