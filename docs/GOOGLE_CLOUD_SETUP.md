@@ -393,12 +393,307 @@ credentials.json
 
 ### 🔐 Для production (Cloud Run):
 
-Вместо файла `service-account.json` используйте:
-- **Secret Manager** в Google Cloud
-- Или передавайте JSON как строку в переменной окружения:
-  ```bash
-  GOOGLE_APPLICATION_CREDENTIALS_JSON='{"type":"service_account",...}'
-  ```
+**Iteration 9 реализует полный Cloud Run deployment с Secret Manager.**
+
+См. детальную инструкцию в разделе **"Шаг 9: Cloud Run Deployment"** ниже.
+
+---
+
+## Шаг 9: Cloud Run Deployment (Iteration 9)
+
+> Этот раздел описывает развертывание всех трех сервисов (Bot, API, MCP) в Google Cloud Run с использованием Secret Manager для безопасного хранения credentials.
+
+### 9.1 Предварительные требования
+
+**Убедитесь, что установлены:**
+- ✅ gcloud CLI (Google Cloud SDK)
+- ✅ Docker для сборки образов
+- ✅ Локально работает `docker-compose up` (для тестирования)
+
+**Проверка gcloud:**
+```bash
+gcloud --version
+gcloud auth list
+```
+
+**Если gcloud не установлен:**
+```bash
+# macOS
+brew install google-cloud-sdk
+
+# Linux/WSL
+curl https://sdk.cloud.google.com | bash
+exec -l $SHELL
+```
+
+### 9.2 Аутентификация и настройка проекта
+
+```bash
+# Войти в Google Cloud
+gcloud auth login
+
+# Установить проект по умолчанию
+gcloud config set project budget-assistant
+
+# Проверить текущий проект
+gcloud config get-value project
+```
+
+### 9.3 Включение необходимых API
+
+```bash
+# Cloud Run API
+gcloud services enable run.googleapis.com
+
+# Container Registry (для хранения Docker образов)
+gcloud services enable containerregistry.googleapis.com
+
+# Secret Manager API (для безопасного хранения credentials)
+gcloud services enable secretmanager.googleapis.com
+```
+
+⏱️ Подождите 30-60 секунд после включения API.
+
+### 9.4 Настройка Docker для Google Container Registry
+
+```bash
+# Настроить Docker для аутентификации с GCR
+gcloud auth configure-docker
+
+# Проверка
+docker info | grep -A 5 "Registry"
+```
+
+### 9.5 Создание секретов в Secret Manager
+
+**Iteration 9 автоматизирует этот процесс**, но можно создать вручную:
+
+#### 9.5.1 Service Account JSON
+
+```bash
+# Создать секрет из файла service-account.json
+gcloud secrets create service-account-json \
+    --data-file=./service-account.json \
+    --replication-policy=automatic
+```
+
+#### 9.5.2 Telegram Bot Token
+
+```bash
+# Создать секрет из переменной окружения
+echo -n "${TELEGRAM_BOT_TOKEN}" | gcloud secrets create telegram-bot-token \
+    --data-file=- \
+    --replication-policy=automatic
+```
+
+#### 9.5.3 Google API Key (Gemini)
+
+```bash
+echo -n "${GOOGLE_API_KEY}" | gcloud secrets create google-api-key \
+    --data-file=- \
+    --replication-policy=automatic
+```
+
+#### 9.5.4 Webhook Secret
+
+```bash
+echo -n "${WEBHOOK_SECRET}" | gcloud secrets create webhook-secret \
+    --data-file=- \
+    --replication-policy=automatic
+```
+
+**Проверить созданные секреты:**
+```bash
+gcloud secrets list
+```
+
+**Вывод:**
+```
+NAME                    CREATED              REPLICATION_POLICY  LOCATIONS
+service-account-json    2025-12-09T10:00:00  automatic           -
+telegram-bot-token      2025-12-09T10:01:00  automatic           -
+google-api-key          2025-12-09T10:02:00  automatic           -
+webhook-secret          2025-12-09T10:03:00  automatic           -
+```
+
+### 9.6 Автоматический деплой всех сервисов
+
+**Iteration 9 предоставляет скрипт `deploy_all.sh`** для автоматического развертывания:
+
+```bash
+# Установить переменные окружения
+export GCP_PROJECT_ID=budget-assistant
+export GCP_REGION=us-central1
+export TELEGRAM_BOT_TOKEN=your-token
+export GOOGLE_API_KEY=your-gemini-key
+export WEBHOOK_SECRET=your-secret
+export GOOGLE_SHEETS_SPREADSHEET_ID=1a2b3c4d5e6f7g8h9i0
+export TELEGRAM_ADMIN_IDS=123456789,987654321
+
+# Запустить деплой
+./scripts/deploy_all.sh
+```
+
+**Скрипт выполнит:**
+1. ✅ Проверит/создаст секреты в Secret Manager
+2. ✅ Соберет и загрузит Docker образ для MCP Service
+3. ✅ Развернет MCP на Cloud Run → получит URL
+4. ✅ Соберет и развернет API Gateway с MCP_API_URL
+5. ✅ Соберет и развернет Bot с BUDGET_API_URL
+6. ✅ Автоматически настроит Telegram webhook
+
+⏱️ **Время деплоя:** ~5-10 минут (первый раз, затем быстрее).
+
+### 9.7 Ручной деплой отдельных сервисов
+
+**Если нужно развернуть только один сервис:**
+
+#### MCP Service (первым)
+```bash
+export GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
+export GEMINI_MODEL=gemini-flash-latest
+./scripts/deploy_mcp.sh
+```
+
+#### API Gateway (вторым)
+```bash
+# Получить URL MCP сервиса
+export MCP_API_URL=$(gcloud run services describe budget-mcp \
+    --region us-central1 --format 'value(status.url)')
+
+./scripts/deploy_api.sh
+```
+
+#### Bot (третьим)
+```bash
+# Получить URL API сервиса
+export BUDGET_API_URL=$(gcloud run services describe budget-api \
+    --region us-central1 --format 'value(status.url)')
+
+export TELEGRAM_ADMIN_IDS=123456789
+./scripts/deploy_bot.sh
+
+# Настроить webhook вручную
+BOT_URL=$(gcloud run services describe budget-bot \
+    --region us-central1 --format 'value(status.url)')
+
+curl "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook?url=${BOT_URL}/webhook&secret_token=${WEBHOOK_SECRET}"
+```
+
+### 9.8 Проверка развертывания
+
+#### 9.8.1 Список сервисов
+```bash
+gcloud run services list --region us-central1
+```
+
+**Ожидаемый вывод:**
+```
+SERVICE      REGION        URL                                    LAST DEPLOYED
+budget-mcp   us-central1   https://budget-mcp-xxx.run.app         2025-12-09
+budget-api   us-central1   https://budget-api-xxx.run.app         2025-12-09
+budget-bot   us-central1   https://budget-bot-xxx.run.app         2025-12-09
+```
+
+#### 9.8.2 Проверка health endpoints
+```bash
+# MCP
+curl https://budget-mcp-xxx.run.app/health
+
+# API
+curl https://budget-api-xxx.run.app/health
+
+# Bot
+curl https://budget-bot-xxx.run.app/health
+```
+
+**Все должны вернуть:** `{"status":"healthy",...}`
+
+#### 9.8.3 Проверка Telegram webhook
+```bash
+curl "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
+```
+
+**Должно показать:**
+```json
+{
+  "ok": true,
+  "result": {
+    "url": "https://budget-bot-xxx.run.app/webhook",
+    "has_custom_certificate": false,
+    "pending_update_count": 0,
+    "max_connections": 40
+  }
+}
+```
+
+### 9.9 Просмотр логов
+
+```bash
+# Логи MCP Service (Gemini AI, Google Sheets)
+gcloud run logs tail budget-mcp --region us-central1
+
+# Логи API Gateway
+gcloud run logs tail budget-api --region us-central1
+
+# Логи Bot (Telegram webhook)
+gcloud run logs tail budget-bot --region us-central1
+
+# Последние 100 строк с фильтром
+gcloud run logs tail budget-mcp --limit 100 | grep ERROR
+```
+
+### 9.10 Обновление секретов
+
+**Если нужно изменить токен или ключ:**
+
+```bash
+# Обновить значение секрета
+echo -n "new-token-value" | gcloud secrets versions add telegram-bot-token \
+    --data-file=-
+
+# Пересоздать деплоймент сервиса (для подгрузки нового секрета)
+gcloud run services update budget-bot --region us-central1
+```
+
+**Для service-account.json:**
+```bash
+# Обновить JSON
+gcloud secrets versions add service-account-json \
+    --data-file=./service-account.json
+
+# Перезапустить MCP сервис
+gcloud run services update budget-mcp --region us-central1
+```
+
+### 9.11 Мониторинг стоимости
+
+**Проверить расходы:**
+```bash
+# Перейти в Cloud Console → Billing → Reports
+# https://console.cloud.google.com/billing/
+```
+
+**Ожидаемые расходы (Iteration 9):**
+- Cloud Run (легкая нагрузка ~1000 сообщений/месяц): **Бесплатно** (в пределах free tier)
+- Secret Manager (4 секрета): **$0.36/месяц**
+- Container Registry (<500MB): **Бесплатно** (в пределах free tier)
+
+**Итого: < $1/месяц** 💰
+
+### 9.12 Откат к предыдущей версии
+
+**Если что-то сломалось после деплоя:**
+
+```bash
+# Посмотреть список ревизий
+gcloud run revisions list --service budget-bot --region us-central1
+
+# Откатить трафик на предыдущую ревизию
+gcloud run services update-traffic budget-bot \
+    --to-revisions=budget-bot-00002-abc=100 \
+    --region us-central1
+```
 
 ---
 
@@ -438,16 +733,50 @@ credentials.json
 
 ---
 
-## 🎯 Следующий шаг
+## 🎯 Следующие шаги
 
-После успешной настройки Google Cloud переходите к:
+### Для локальной разработки (Iteration 1-8 завершены)
 
-**Итерация 5: Реализация Google Sheets Storage**
+После успешной настройки Google Cloud вы можете:
 
-Я создам файлы:
-- `src/mcp/storage/interface.py` — абстрактный интерфейс
-- `src/mcp/storage/sheets.py` — Google Sheets реализация
-- Обновлю `src/mcp/config.py` — добавлю настройки для Sheets
-- Добавлю тестовые endpoints
+1. **Запустить все сервисы локально:**
+   ```bash
+   docker-compose up --build
+   ```
 
-Готов начать? 🚀
+2. **Тестировать бота в Telegram:**
+   ```bash
+   poetry run python -m src.bot.run_polling
+   ```
+
+3. **Проверить интеграцию с Google Sheets:**
+   - Отправить боту: "купил хлеб 50 рублей"
+   - Проверить, что запись появилась в таблице
+
+### Для production деплоя (Iteration 9)
+
+**Развернуть в Google Cloud Run:**
+
+1. Установить и настроить gcloud CLI (см. Шаг 9.1-9.4)
+2. Создать секреты в Secret Manager (см. Шаг 9.5)
+3. Запустить автоматический деплой:
+   ```bash
+   ./scripts/deploy_all.sh
+   ```
+
+**Iteration 9 включает:**
+- ✅ docker-compose для локальной разработки
+- ✅ Secret Manager для безопасного хранения credentials
+- ✅ Автоматический деплой всех 3 сервисов
+- ✅ Настройка Telegram webhook
+- ✅ Полная документация Cloud Run deployment
+
+### Iteration 10 (в разработке)
+
+Следующая итерация добавит:
+- 📊 Cloud Monitoring и Error Reporting
+- 🔒 VPC networking для internal-only сервисов
+- 🏗️ Infrastructure as Code с Terraform
+- 🚀 CI/CD автоматизация через GitHub Actions
+
+Готовы к деплою? 🚀
