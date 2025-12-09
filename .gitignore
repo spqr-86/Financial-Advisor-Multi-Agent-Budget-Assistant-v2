@@ -41,3 +41,9 @@ coverage.xml
 
 # Obsidian
 .obsidian/
+
+# Claude Code
+.claudeignore
+
+# Learning materials (large PDFs)
+5-days/
