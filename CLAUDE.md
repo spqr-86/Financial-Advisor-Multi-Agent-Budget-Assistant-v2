@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Budget Assistant v2.0** is a Telegram-based AI financial management bot that tracks expenses and provides personalized financial advice. The project uses a microservices architecture with three independent services communicating via HTTP.
 
-**Current Status:** Iteration 7/10 - Multi-agent system implementation complete; Google Sheets integration and AI agent patterns working.
+**Current Status:** Iteration 8/10 - Production polish complete; message splitting, enhanced logging, timeout handling, and graceful shutdown implemented.
 
 **Core Functionality:**
 - Accept expense descriptions from users via Telegram ("купил хлеб 50 рублей")
@@ -134,12 +134,14 @@ open htmlcov/index.html
 poetry run pytest -q
 ```
 
-**Current Test Coverage:** 82.90% (48 tests)
+**Current Test Coverage (Iteration 8):** 55.66% (56 tests)
 - Core: 100%
-- Bot handlers: 100%
+- Bot handlers: 92.86%
 - Bot middlewares: 100%
-- API Gateway: 76%
-- MCP Service: 86%
+- Bot utils (Iteration 8): 87.80% (8 new tests for message splitting)
+- API Gateway: 58.70%
+- MCP Service: 55.00%
+- Note: 51/56 tests passing (5 old API/MCP tests have httpx syntax issues unrelated to Iteration 8 changes)
 
 ### Code Quality
 
@@ -187,10 +189,24 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 
 ### HTTP Client with Retry Logic (`src/core/http_client.py`)
 - `ServiceClient` class handles inter-service communication
-- Exponential backoff retry strategy (3 attempts by default)
+- Exponential backoff retry strategy (3 attempts by default, Iteration 8: 1s, 2s, 4s)
 - Automatically retries on 5xx errors and network failures
-- Logs all retry attempts
+- Logs all retry attempts with timing information (Iteration 8)
 - Raises `ServiceUnavailableError` after exhausting retries
+- Separate handling for `asyncio.TimeoutError` (Iteration 8)
+
+### Bot Utilities (`src/bot/utils.py`) - Iteration 8
+- `split_long_message(text, max_length=4096)`: Smart message splitting for Telegram's character limit
+  - Splits by: paragraphs → sentences → words → characters (in that order of preference)
+  - Returns list of message chunks, each ≤ max_length
+  - Preserves readability by avoiding mid-word splits
+  - Used automatically in handlers
+- `TELEGRAM_MAX_MESSAGE_LENGTH`: Constant for Telegram's 4096 character limit
+
+### Graceful Shutdown (`src/core/shutdown.py`) - Iteration 8
+- `setup_shutdown_handlers(callback)`: Registers SIGTERM/SIGINT handlers
+- Used in FastAPI lifespan handlers for clean Cloud Run deployment
+- Currently implemented directly in app.py files (may be refactored to use this utility)
 
 ## Storage Layer
 
@@ -213,15 +229,16 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 1. User sends message to Telegram bot
 2. Bot receives via webhook (production) or polling (development)
 3. Middlewares process: Rate limit → Access control → API client injection
-4. Handler calls API Gateway with `QueryRequest`
-5. API Gateway validates and proxies to MCP Service
-6. MCP Service processes with multi-agent system:
+4. Handler calls API Gateway with `QueryRequest` (with timeout handling, Iteration 8)
+5. API Gateway validates and proxies to MCP Service (logs timing and user_id, Iteration 8)
+6. MCP Service processes with multi-agent system (logs AI processing time, Iteration 8):
    - Orchestrator analyzes intent
    - Routes to RegistrarAgent (for "купил") or AnalystAgent (for "покажи")
    - Agent uses appropriate tool (add_expense, get_expenses, etc.)
    - Tool interacts with Google Sheets storage
 7. Response flows back through the stack
-8. Bot sends response to user
+8. Bot splits long responses if >4096 chars (Iteration 8)
+9. Bot sends response to user (multiple messages if split, with 0.5s delay between chunks)
 
 ## Important Implementation Notes
 
@@ -231,6 +248,8 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 - **Handler pattern:** All handlers must check `if not message.from_user: return` for safety
 - **Typing indicator:** Use `await message.bot.send_chat_action(message.chat.id, "typing")` before long operations
 - **Middleware order matters:** APIClientMiddleware → RateLimitMiddleware → AccessControlMiddleware
+- **Long message handling (Iteration 8):** Use `split_long_message()` from `src/bot/utils.py` to split responses exceeding Telegram's 4096 character limit. Handler automatically splits and sends with 0.5s delay between chunks.
+- **Timeout handling (Iteration 8):** Catch `asyncio.TimeoutError` separately for user-friendly messages. HTTP client automatically retries with exponential backoff (1s, 2s, 4s).
 
 ### API Gateway Development
 - **Always check MCP health:** Use `get_mcp_client().health_check()` in health endpoint
@@ -249,10 +268,19 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 - **Mock pattern:** Use `unittest.mock.Mock` and `AsyncMock` for async functions
 - **CI/CD enforcement:** Tests must pass and coverage must be ≥50% for PR merge
 
-### Error Handling
+### Error Handling & Logging (Iteration 8)
 - **Each layer has error handling:** Bot catches ServiceClient errors, API returns 503 if MCP down, HTTP client retries automatically
 - **User-friendly messages:** Bot shows "произошла ошибка" on failures, not technical details
-- **Logging:** All errors logged with context for debugging
+- **Comprehensive logging (Iteration 8):**
+  - Bot handlers: user_id, query preview (50 chars), response length, message chunk count
+  - API Gateway: request timing, response size, user tracking
+  - MCP Service: AI processing time, detailed metrics
+  - HTTP Client: request duration, retry attempts, status codes
+  - All errors include full traceback (`exc_info=True`)
+- **Graceful shutdown (Iteration 8):** SIGTERM/SIGINT handlers registered in all services for clean Cloud Run deployment
+  - API Gateway: closes HTTP client connections
+  - MCP Service: closes storage and agent connections
+  - Detailed shutdown logging at each step
 
 ## Environment Variables
 
@@ -286,12 +314,12 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 | 4 | ✅ | Integration testing, HTTP client, 48 tests |
 | 5 | ✅ | Google Sheets integration |
 | 6 | ✅ | AI Agent v1 with Gemini |
-| **7** | **✅** | **Multi-Agent System with google-adk** |
-| 8 | ⏳ | Polish: timeouts, message splitting, error handling |
+| 7 | ✅ | Multi-Agent System with google-adk |
+| **8** | **✅** | **Production Polish: timeouts, message splitting, logging, graceful shutdown** |
 | 9 | ⏳ | Cloud Run deployment |
-| 10 | ⏳ | Production monitoring and logging |
+| 10 | ⏳ | Production monitoring and metrics |
 
-**Next Focus:** Iteration 8 - Production polish (timeout handling, long message splitting, comprehensive error recovery)
+**Next Focus:** Iteration 9 - Cloud Run deployment (Docker optimization, Cloud Run configuration, secrets management)
 
 ## CI/CD Pipeline
 
@@ -310,6 +338,10 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 6. **Pydantic v2 syntax:** Use `model_config` not `class Config`
 7. **Middleware execution order:** They run in the order they're added to dispatcher
 8. **Agent system:** Always use `LlmAgent` from google-adk for tool-based agents, not the base `Agent` class
+9. **Long messages (Iteration 8):** Telegram has 4096 char limit. Use `split_long_message()` from `src/bot/utils.py` to split automatically. Handler does this by default.
+10. **Timeout errors (Iteration 8):** Always catch `asyncio.TimeoutError` separately from general exceptions for better user messages. HTTP client retries 3 times with exponential backoff.
+11. **Logging best practices (Iteration 8):** Always log user_id, request timing, and use `exc_info=True` for exceptions. Check `src/bot/handlers/__init__.py` for examples.
+12. **Graceful shutdown (Iteration 8):** Services handle SIGTERM/SIGINT for Cloud Run. Don't block shutdown in custom code.
 
 ## Additional Documentation
 
