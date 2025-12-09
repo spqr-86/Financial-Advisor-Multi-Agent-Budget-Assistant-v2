@@ -1,0 +1,55 @@
+# Git
+.git/
+.gitignore
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Testing
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Credentials (CRITICAL)
+.env
+.env.*
+service-account.json
+credentials.json
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Scripts
+scripts/
+
+# Logs
+*.log
+
+# Docker
+docker/
+Dockerfile*
+docker-compose*.yml
+
+# Learning materials
+.obsidian/
+5-days/

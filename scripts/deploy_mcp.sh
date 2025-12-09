@@ -18,11 +18,17 @@ gcloud run deploy ${SERVICE_NAME} \
     --allow-unauthenticated \
     --port 8082 \
     --memory 1Gi \
+    --cpu 1 \
     --timeout 300 \
-    --set-env-vars "GOOGLE_API_KEY=${GOOGLE_API_KEY:-},SPREADSHEET_NAME=${SPREADSHEET_NAME:-Бюджет}"
+    --max-instances 10 \
+    --min-instances 0 \
+    --concurrency 80 \
+    --set-secrets "GOOGLE_API_KEY=google-api-key:latest,GOOGLE_APPLICATION_CREDENTIALS=service-account-json:latest" \
+    --set-env-vars "GOOGLE_SHEETS_SPREADSHEET_ID=${GOOGLE_SHEETS_SPREADSHEET_ID},GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-latest},LOG_LEVEL=INFO,ENVIRONMENT=production" \
+    --project ${PROJECT_ID}
 
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} \
-    --region ${REGION} --format 'value(status.url)')
+    --region ${REGION} --format 'value(status.url)' --project ${PROJECT_ID})
 
 echo "✅ MCP deployed: ${SERVICE_URL}"
 echo "   Test: curl ${SERVICE_URL}/health"

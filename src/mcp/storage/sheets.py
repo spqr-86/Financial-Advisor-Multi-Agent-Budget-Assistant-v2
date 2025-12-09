@@ -41,10 +41,21 @@ class GoogleSheetsStorage(StorageInterface):
             return
 
         try:
-            creds = Credentials.from_service_account_file(
-                settings.google_application_credentials,
-                scopes=SCOPES,
-            )
+            # Support both file path (local) and JSON string (Cloud Run)
+            if settings.google_application_credentials.startswith('{'):
+                # JSON string from Secret Manager
+                import json
+                creds_dict = json.loads(settings.google_application_credentials)
+                creds = Credentials.from_service_account_info(
+                    creds_dict,
+                    scopes=SCOPES,
+                )
+            else:
+                # File path (local dev)
+                creds = Credentials.from_service_account_file(
+                    settings.google_application_credentials,
+                    scopes=SCOPES,
+                )
             self._client = gspread.authorize(creds)
 
             # Find or create spreadsheet

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Budget Assistant v2.0** is a Telegram-based AI financial management bot that tracks expenses and provides personalized financial advice. The project uses a microservices architecture with three independent services communicating via HTTP.
 
-**Current Status:** Iteration 8/10 - Production polish complete; message splitting, enhanced logging, timeout handling, and graceful shutdown implemented.
+**Current Status:** Iteration 9/10 - Cloud Run deployment complete; docker-compose for local dev, Secret Manager integration, deployment scripts, and comprehensive Cloud Run documentation.
 
 **Core Functionality:**
 - Accept expense descriptions from users via Telegram ("купил хлеб 50 рублей")
@@ -98,7 +98,33 @@ cp .env.example .env
 
 ### Running Services Locally (Development)
 
-**Important:** Run all three services in separate terminals for local development.
+**Option 1: Using docker-compose (Recommended for Iteration 9+)**
+
+```bash
+# Build all images
+docker-compose build
+
+# Start all services (foreground)
+docker-compose up
+
+# Start in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f bot
+docker-compose logs -f api
+docker-compose logs -f mcp
+
+# Stop all
+docker-compose down
+
+# Rebuild and restart
+docker-compose up --build
+```
+
+**Option 2: Manual startup (3 terminals)**
+
+Run all three services in separate terminals:
 
 ```bash
 # Terminal 1: MCP Service (port 8082)
@@ -317,11 +343,11 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 | 5 | ✅ | Google Sheets integration |
 | 6 | ✅ | AI Agent v1 with Gemini |
 | 7 | ✅ | Multi-Agent System with google-adk |
-| **8** | **✅** | **Production Polish: timeouts, message splitting, logging, graceful shutdown** |
-| 9 | ⏳ | Cloud Run deployment |
+| 8 | ✅ | Production Polish: timeouts, message splitting, logging, graceful shutdown |
+| **9** | **✅** | **Cloud Run Deployment: docker-compose, Secret Manager, deployment scripts** |
 | 10 | ⏳ | Production monitoring and metrics |
 
-**Next Focus:** Iteration 9 - Cloud Run deployment (Docker optimization, Cloud Run configuration, secrets management)
+**Next Focus:** Iteration 10 - Production monitoring (Cloud Logging, Error Reporting, VPC networking, IaC with Terraform)
 
 ## CI/CD Pipeline
 
@@ -329,6 +355,120 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 - Triggers on push to `dev` branch and all pull requests
 - Steps: Checkout → Python setup → Install deps → Ruff linting → Pytest
 - Requirements: Linting must pass, tests must pass, coverage ≥50%
+
+## Cloud Run Deployment (Iteration 9)
+
+### Prerequisites
+
+1. Google Cloud Project with billing enabled
+2. gcloud CLI installed and authenticated
+3. Docker installed locally
+4. Environment variables configured in .env
+
+### Setup (One-time)
+
+```bash
+# Authenticate with Google Cloud
+gcloud auth login
+gcloud config set project ${GCP_PROJECT_ID}
+
+# Enable required APIs
+gcloud services enable run.googleapis.com
+gcloud services enable containerregistry.googleapis.com
+gcloud services enable secretmanager.googleapis.com
+
+# Configure Docker for GCR
+gcloud auth configure-docker
+```
+
+### Deploy All Services
+
+```bash
+# Export required variables
+export GCP_PROJECT_ID=your-project-id
+export GCP_REGION=us-central1
+export TELEGRAM_BOT_TOKEN=your-token
+export GOOGLE_API_KEY=your-api-key
+export WEBHOOK_SECRET=your-secret
+export GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
+export TELEGRAM_ADMIN_IDS=123456,789012
+
+# Deploy (runs all deployment scripts in order)
+./scripts/deploy_all.sh
+```
+
+The `deploy_all.sh` script will:
+1. Create/verify secrets in Google Secret Manager
+2. Deploy MCP Service → retrieve URL
+3. Deploy API Gateway with MCP_API_URL → retrieve URL
+4. Deploy Bot with BUDGET_API_URL → retrieve URL
+5. Set Telegram webhook automatically
+
+### Verify Deployment
+
+```bash
+# Check service status
+gcloud run services list --project=${GCP_PROJECT_ID}
+
+# Test health endpoints
+BOT_URL=$(gcloud run services describe budget-bot --region ${GCP_REGION} --format 'value(status.url)')
+curl ${BOT_URL}/health
+
+# View logs
+gcloud run logs tail budget-bot --region ${GCP_REGION}
+gcloud run logs tail budget-api --region ${GCP_REGION}
+gcloud run logs tail budget-mcp --region ${GCP_REGION}
+```
+
+### Troubleshooting
+
+**Bot not receiving messages:**
+```bash
+# Check webhook status
+curl "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
+
+# Should show your Cloud Run URL
+# If wrong, redeploy or manually set:
+curl "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook?url=https://budget-bot-xxx.run.app/webhook&secret_token=${WEBHOOK_SECRET}"
+```
+
+**MCP service errors (Gemini quota):**
+```bash
+# Check logs for quota issues
+gcloud run logs tail budget-mcp --limit 50 | grep "🚨"
+
+# Switch model if quota exceeded
+gcloud run services update budget-mcp \
+    --set-env-vars "GEMINI_MODEL=gemini-2.5-flash" \
+    --region ${GCP_REGION}
+```
+
+**Update secrets:**
+```bash
+# Update a secret value
+echo -n "new-token-value" | gcloud secrets versions add telegram-bot-token \
+    --data-file=- --project=${GCP_PROJECT_ID}
+
+# Redeploy service to pick up new secret
+gcloud run services update budget-bot --region ${GCP_REGION}
+```
+
+**View detailed service info:**
+```bash
+# Service configuration
+gcloud run services describe budget-bot --region ${GCP_REGION}
+
+# Recent deployments
+gcloud run revisions list --service budget-bot --region ${GCP_REGION}
+```
+
+### Cost Estimation
+
+**Light usage (~1000 messages/month):**
+- Cloud Run: Free tier (2M requests/month)
+- Secret Manager: $0.36/month
+- Container Registry: Free tier
+- **Total: < $1/month**
 
 ## Common Gotchas
 

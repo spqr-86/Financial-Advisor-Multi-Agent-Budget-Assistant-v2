@@ -6,13 +6,13 @@ REGION="${GCP_REGION:-us-central1}"
 SERVICE_NAME="budget-bot"
 IMAGE="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
 
+: "${BUDGET_API_URL:?Error: BUDGET_API_URL not set. Run deploy_all.sh instead.}"
+
 echo "🤖 Deploying Telegram Bot..."
 
-# Build & push
 docker build -f docker/Dockerfile.bot -t ${IMAGE} .
 docker push ${IMAGE}
 
-# Deploy
 gcloud run deploy ${SERVICE_NAME} \
     --image ${IMAGE} \
     --platform managed \
@@ -20,12 +20,17 @@ gcloud run deploy ${SERVICE_NAME} \
     --allow-unauthenticated \
     --port 8080 \
     --memory 512Mi \
-    --set-env-vars "TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}"
+    --cpu 1 \
+    --timeout 60 \
+    --max-instances 5 \
+    --min-instances 0 \
+    --concurrency 100 \
+    --set-secrets "TELEGRAM_BOT_TOKEN=telegram-bot-token:latest,WEBHOOK_SECRET=webhook-secret:latest" \
+    --set-env-vars "BUDGET_API_URL=${BUDGET_API_URL},TELEGRAM_ADMIN_IDS=${TELEGRAM_ADMIN_IDS:-},LOG_LEVEL=INFO,ENVIRONMENT=production" \
+    --project ${PROJECT_ID}
 
-# Get URL and set webhook
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} \
-    --region ${REGION} --format 'value(status.url)')
-
-curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook?url=${SERVICE_URL}/webhook"
+    --region ${REGION} --format 'value(status.url)' --project ${PROJECT_ID})
 
 echo "✅ Bot deployed: ${SERVICE_URL}"
+echo "   Test: curl ${SERVICE_URL}/health"
