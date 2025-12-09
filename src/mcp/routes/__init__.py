@@ -1,6 +1,7 @@
 """MCP service routes."""
 
 import logging
+import time
 
 from fastapi import APIRouter, Depends
 
@@ -48,19 +49,38 @@ async def process_mcp_query(
     agent: ADKBudgetAgent = Depends(get_agent),
 ) -> QueryResponse:
     """Process user query through AI agent system."""
-    logger.info(f"Processing query from user {request.user_id}: {request.query[:50]}")
+    start_time = time.time()
+    query_preview = request.query[:50] + "..." if len(request.query) > 50 else request.query
 
-    # Process through AI agent
-    response = await agent.process(
-        query=request.query,
-        user_id=request.user_id,
-    )
+    logger.info(f"MCP processing query from user {request.user_id}: {query_preview}")
 
-    return QueryResponse(
-        response=response,
-        user_id=request.user_id,
-        session_id=request.session_id or request.user_id,
-    )
+    try:
+        # Process through AI agent
+        response = await agent.process(
+            query=request.query,
+            user_id=request.user_id,
+        )
+
+        elapsed = time.time() - start_time
+        logger.info(
+            f"MCP query processed for user {request.user_id} in {elapsed:.2f}s "
+            f"(response: {len(response)} chars)"
+        )
+
+        return QueryResponse(
+            response=response,
+            user_id=request.user_id,
+            session_id=request.session_id or request.user_id,
+        )
+
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(
+            f"MCP query failed for user {request.user_id} after {elapsed:.2f}s: "
+            f"{type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        raise
 
 
 # Storage endpoints for testing

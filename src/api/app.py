@@ -1,6 +1,7 @@
 """FastAPI Gateway for Budget Assistant."""
 
 import logging
+import signal
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -19,6 +20,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Shutdown flag for graceful shutdown
+_shutdown_event = False
+
 # MCP client singleton
 mcp_client: ServiceClient | None = None
 
@@ -35,15 +39,42 @@ def get_mcp_client() -> ServiceClient:
     return mcp_client
 
 
+async def graceful_shutdown() -> None:
+    """Handle graceful shutdown."""
+    global _shutdown_event
+    _shutdown_event = True
+    logger.info("Shutting down API Gateway gracefully...")
+
+    # Close HTTP client
+    if mcp_client:
+        logger.info("Closing MCP client connection...")
+        await mcp_client.close()
+
+    logger.info("API Gateway shutdown complete")
+
+
+def signal_handler(sig: int, frame: any) -> None:
+    """Handle shutdown signals."""
+    sig_name = signal.Signals(sig).name
+    logger.info(f"Received {sig_name}, initiating graceful shutdown...")
+    # Note: FastAPI/uvicorn handles the actual shutdown
+    # This is just for logging
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     logger.info("Starting API Gateway...")
+
+    # Register signal handlers
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    logger.info("Shutdown handlers registered (SIGTERM, SIGINT)")
+
     yield
+
     # Cleanup
-    if mcp_client:
-        await mcp_client.close()
-    logger.info("API Gateway stopped")
+    await graceful_shutdown()
 
 
 app = FastAPI(
