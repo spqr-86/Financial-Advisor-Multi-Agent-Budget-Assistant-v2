@@ -470,6 +470,166 @@ gcloud run revisions list --service budget-bot --region ${GCP_REGION}
 - Container Registry: Free tier
 - **Total: < $1/month**
 
+## MCP Server (Iteration 10)
+
+Budget Assistant теперь поддерживает **Model Context Protocol (MCP)** - стандарт от Anthropic для интеграции AI-приложений с внешними инструментами. Это позволяет использовать Budget Assistant прямо из Claude Desktop!
+
+### Архитектура: Dual Interface
+
+MCP Service теперь предоставляет два интерфейса параллельно:
+- **HTTP REST API** (порт 8082) - для Telegram Bot через API Gateway (существующая архитектура)
+- **MCP Protocol** (stdio/SSE) - для Claude Desktop, Cursor, MCP Inspector
+
+Оба интерфейса используют одну и ту же бизнес-логику (ADKBudgetAgent и GoogleSheetsStorage).
+
+### Доступные режимы
+
+**1. Stdio (Claude Desktop, Cursor):**
+```bash
+./scripts/run_mcp_stdio.sh
+# или
+poetry run python -m src.mcp.server.run_stdio
+```
+
+**2. SSE (MCP Inspector, веб-клиенты):**
+```bash
+export MCP_TRANSPORT=sse
+poetry run python -m src.mcp.app
+# Endpoint: http://localhost:8083/mcp/sse
+```
+
+**3. Both (Production):**
+```bash
+export MCP_TRANSPORT=both
+poetry run python -m src.mcp.app
+# HTTP REST: :8082
+# MCP SSE: :8082/mcp/sse
+```
+
+### MCP Tools
+
+Доступные инструменты для Claude:
+- **process_query(query, user_id)** - основной tool, обрабатывает любой запрос через AI систему
+  - Примеры: "купил хлеб 50 рублей", "покажи расходы", "статистика"
+- **add_expense(category, amount, description, user_id)** - прямое добавление расхода
+- **get_expenses(limit, category, user_id)** - просмотр расходов
+- **get_statistics(period, user_id)** - статистика по категориям
+- **delete_last_expense(user_id)** - удаление последнего расхода
+
+### MCP Resources
+
+- **budget://help** - инструкция по использованию
+- **budget://categories** - список категорий расходов (JSON)
+
+### Быстрый старт с Claude Desktop
+
+1. **Убедитесь что зависимости установлены:**
+```bash
+poetry install  # fastmcp ^2.0.0 будет установлен
+```
+
+2. **Настройте `.env` (если еще не настроен):**
+```env
+GOOGLE_API_KEY=your-gemini-api-key
+GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
+GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
+MCP_TRANSPORT=stdio  # для Claude Desktop
+```
+
+3. **Сделайте скрипт исполняемым:**
+```bash
+chmod +x scripts/run_mcp_stdio.sh
+```
+
+4. **Настройте Claude Desktop:**
+
+Откройте конфигурацию:
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
+
+Добавьте:
+```json
+{
+  "mcpServers": {
+    "budget-assistant": {
+      "command": "/absolute/path/to/budget-assistant-v2/scripts/run_mcp_stdio.sh",
+      "cwd": "/absolute/path/to/budget-assistant-v2"
+    }
+  }
+}
+```
+
+**Важно:** Используйте absolute paths (например `/Users/petrbaldaev/Dev/budget-assistant-v2`).
+
+5. **Перезапустите Claude Desktop**
+
+6. **Тестируйте:**
+- Откройте новую беседу в Claude
+- Напишите: "купил хлеб 50 рублей"
+- Claude автоматически использует `budget-assistant` tool
+
+### Тестирование с MCP Inspector
+
+```bash
+# Запустить в SSE режиме
+./scripts/test_mcp_inspector.sh
+
+# В браузере
+npx @modelcontextprotocol/inspector
+# Подключиться к: http://localhost:8083/mcp/sse
+```
+
+### Структура файлов
+
+```
+src/mcp/server/
+├── __init__.py          # Экспорты
+├── config.py            # MCPServerSettings
+├── app.py               # FastMCP сервер с tools/resources/prompts
+├── tools.py             # Обертки над ADKBudgetAgent
+├── resources.py         # Контекст для Claude (help, categories)
+└── run_stdio.py         # Entry point для stdio режима
+
+scripts/
+├── run_mcp_stdio.sh     # Запуск для Claude Desktop
+└── test_mcp_inspector.sh # Запуск для MCP Inspector
+```
+
+### Документация
+
+- **`README_MCP.md`** - Quick start guide для пользователей
+- **`docs/MCP_SERVER.md`** - Полная техническая документация
+- **`docs/CLAUDE_DESKTOP_CONFIG.md`** - Детальная инструкция по настройке Claude Desktop
+
+### Environment Variables (новые)
+
+```env
+MCP_TRANSPORT=stdio          # stdio | sse | both
+MCP_SSE_HOST=0.0.0.0
+MCP_SSE_PORT=8083
+```
+
+### Troubleshooting
+
+**Claude Desktop не видит сервер:**
+1. Проверьте absolute paths в `claude_desktop_config.json`
+2. Убедитесь скрипт executable: `chmod +x scripts/run_mcp_stdio.sh`
+3. Проверьте логи: `~/Library/Logs/Claude/mcp-server-budget-assistant.log` (macOS)
+
+**SSE endpoint не отвечает:**
+1. Проверьте `MCP_TRANSPORT=sse` или `both` в `.env`
+2. Убедитесь порт 8083 свободен: `lsof -i :8083`
+
+**Telegram Bot перестал работать:**
+- Не должен! HTTP REST API на порту 8082 сохранен для обратной совместимости.
+- MCP Server работает параллельно, не влияя на Bot/API Gateway.
+
+### Dependencies
+
+Добавлена зависимость:
+- **fastmcp** ^2.0.0 - высокоуровневый framework для MCP серверов
+
 ## Common Gotchas
 
 1. **Don't commit secrets:** Never commit `.env`, `service-account.json`, or any credentials
