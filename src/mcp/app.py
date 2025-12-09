@@ -1,7 +1,6 @@
 """FastAPI MCP Service for Budget Assistant."""
 
 import logging
-import signal
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -18,55 +17,28 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Shutdown flag for graceful shutdown
-_shutdown_event = False
-
-
-async def graceful_shutdown() -> None:
-    """Handle graceful shutdown."""
-    global _shutdown_event
-    _shutdown_event = True
-    logger.info("Shutting down MCP Service gracefully...")
-
-    # Close any open resources (storage connections, etc.)
-    from src.mcp.routes import _storage, _agent
-
-    if _storage:
-        logger.info("Closing storage connections...")
-        # GoogleSheetsStorage doesn't need explicit close, but we log it
-
-    if _agent:
-        logger.info("Shutting down AI agent...")
-        # ADKBudgetAgent cleanup if needed
-
-    logger.info("MCP Service shutdown complete")
-
-
-def signal_handler(sig: int, frame: any) -> None:
-    """Handle shutdown signals."""
-    sig_name = signal.Signals(sig).name
-    logger.info(f"Received {sig_name}, initiating graceful shutdown...")
-    # Note: FastAPI/uvicorn handles the actual shutdown
-    # This is just for logging
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     logger.info("Starting MCP Service...")
-
-    # Register signal handlers
-    signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
-    logger.info("Shutdown handlers registered (SIGTERM, SIGINT)")
-
-    # Initialize agent system on startup
     logger.info("AI agent system ready (lazy initialization)")
 
     yield
 
-    # Cleanup
-    await graceful_shutdown()
+    # Cleanup on shutdown (uvicorn handles SIGTERM/SIGINT automatically)
+    logger.info("Shutting down MCP Service gracefully...")
+
+    # Close any open resources
+    from src.mcp.routes import _storage, _agent
+
+    if _storage:
+        logger.info("Closing storage connections...")
+
+    if _agent:
+        logger.info("Shutting down AI agent...")
+
+    logger.info("MCP Service shutdown complete")
 
 
 app = FastAPI(

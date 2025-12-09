@@ -17,6 +17,7 @@ class MCPSettings(BaseAppSettings):
     # Agent settings
     agent_timeout: int = 60
     max_retries: int = 3
+    gemini_model: str = "gemini-flash-latest"  # Can be overridden via GEMINI_MODEL env var
 
 
 settings = MCPSettings()

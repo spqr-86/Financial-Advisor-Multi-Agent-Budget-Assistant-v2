@@ -36,7 +36,7 @@ retry_config = types.HttpRetryOptions(
 registrar_agent = LlmAgent(
     name="RegistrarAgent",
     model=Gemini(
-        model="gemini-2.0-flash-exp",  # Using latest experimental model
+        model=settings.gemini_model,  # Configurable via GEMINI_MODEL env var
         retry_options=retry_config,
     ),
     instruction="""Ты - агент-регистратор для семейного бюджета.
@@ -73,7 +73,7 @@ registrar_agent = LlmAgent(
 analyst_agent = LlmAgent(
     name="AnalystAgent",
     model=Gemini(
-        model="gemini-2.0-flash-exp",  # Using latest experimental model
+        model=settings.gemini_model,  # Configurable via GEMINI_MODEL env var
         retry_options=retry_config,
     ),
     instruction="""Ты - агент-аналитик для семейного бюджета.
@@ -104,7 +104,7 @@ analyst_agent = LlmAgent(
 root_agent = LlmAgent(
     name="BudgetOrchestrator",
     model=Gemini(
-        model="gemini-2.0-flash-exp",  # Using latest experimental model
+        model=settings.gemini_model,  # Configurable via GEMINI_MODEL env var
         retry_options=retry_config,
     ),
     instruction="""Ты - оркестратор системы управления семейным бюджетом.
@@ -178,5 +178,15 @@ class ADKBudgetAgent:
                 return "Извините, не смог обработать запрос."
 
         except Exception as e:
+            # Check if it's a quota/rate limit error (429)
+            error_str = str(e).lower()
+            if "429" in error_str or "quota" in error_str or "resource_exhausted" in error_str:
+                logger.error(
+                    "🚨 GEMINI API QUOTA EXCEEDED! "
+                    f"Model quota exhausted. Error: {e}",
+                    exc_info=True
+                )
+                return "Извините, превышен лимит запросов к AI. Попробуйте позже."
+
             logger.error(f"Error in ADK agent: {e}", exc_info=True)
             return f"Произошла ошибка: {str(e)}"

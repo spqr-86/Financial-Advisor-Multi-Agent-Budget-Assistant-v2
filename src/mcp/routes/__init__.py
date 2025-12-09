@@ -67,6 +67,13 @@ async def process_mcp_query(
             f"(response: {len(response)} chars)"
         )
 
+        # Check if response indicates quota issue (agent handled the error gracefully)
+        if "превышен лимит" in response.lower() or "quota" in response.lower():
+            logger.warning(
+                f"🚨 QUOTA WARNING: Response indicates quota exhausted for user {request.user_id}. "
+                f"Check Gemini API quota at: https://ai.google.dev/gemini-api/docs/rate-limits"
+            )
+
         return QueryResponse(
             response=response,
             user_id=request.user_id,
@@ -75,11 +82,21 @@ async def process_mcp_query(
 
     except Exception as e:
         elapsed = time.time() - start_time
-        logger.error(
-            f"MCP query failed for user {request.user_id} after {elapsed:.2f}s: "
-            f"{type(e).__name__}: {e}",
-            exc_info=True,
-        )
+
+        # Special handling for quota errors
+        error_str = str(e).lower()
+        if "429" in error_str or "quota" in error_str or "resource_exhausted" in error_str:
+            logger.error(
+                f"🚨 GEMINI API QUOTA EXCEEDED for user {request.user_id} after {elapsed:.2f}s! "
+                f"Check quota at: https://ai.google.dev/gemini-api/docs/rate-limits",
+                exc_info=True,
+            )
+        else:
+            logger.error(
+                f"MCP query failed for user {request.user_id} after {elapsed:.2f}s: "
+                f"{type(e).__name__}: {e}",
+                exc_info=True,
+            )
         raise
 
 

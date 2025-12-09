@@ -261,6 +261,7 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 - **Tools in separate module:** Tool definitions in `src/mcp/agents/tools/sheets.py`
 - **Prompts in files:** Agent instructions loaded from `prompts/agents/*.txt`
 - **Storage operations:** Always use `StorageInterface` methods, never direct Google Sheets calls
+- **Model selection:** Use `gemini-2.0-flash` for stable quota. Avoid experimental models like `gemini-2.0-flash-exp` in production (low free-tier quota). Available models: `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-flash-latest`. Check quota errors with 🚨 emoji in logs.
 
 ### Testing
 - **Async tests:** All tests use `@pytest.mark.asyncio` decorator
@@ -298,6 +299,7 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 - `GOOGLE_API_KEY` - Gemini API key
 - `GOOGLE_APPLICATION_CREDENTIALS` - Path to service account JSON file
 - `GOOGLE_SHEETS_SPREADSHEET_ID` - Spreadsheet ID from Google Sheets URL
+- `GEMINI_MODEL` - Gemini model name (default: `gemini-flash-latest`). Use this to quickly switch models when quota exhausted.
 
 **Common (all services):**
 - `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
@@ -342,6 +344,7 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 10. **Timeout errors (Iteration 8):** Always catch `asyncio.TimeoutError` separately from general exceptions for better user messages. HTTP client retries 3 times with exponential backoff.
 11. **Logging best practices (Iteration 8):** Always log user_id, request timing, and use `exc_info=True` for exceptions. Check `src/bot/handlers/__init__.py` for examples.
 12. **Graceful shutdown (Iteration 8):** Services handle SIGTERM/SIGINT for Cloud Run. Don't block shutdown in custom code.
+13. **Gemini API quota issues:** If bot times out (30s+) with no response, check MCP logs for `🚨 GEMINI API QUOTA EXCEEDED` message. **Quick fix:** Change `GEMINI_MODEL=gemini-flash-latest` in `.env` to another model (try `gemini-2.5-flash`, `gemini-pro-latest`, or `gemini-flash-lite-latest`), then restart MCP service. Check quota at https://ai.google.dev/gemini-api/docs/rate-limits. To see all available models: `poetry run python -c "from google import genai; client = genai.Client(); [print(m.name) for m in client.models.list() if 'gemini' in m.name.lower()]"`
 
 ## Additional Documentation
 
