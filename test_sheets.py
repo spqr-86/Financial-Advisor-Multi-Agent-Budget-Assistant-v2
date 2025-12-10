@@ -1,6 +1,11 @@
 """Test Google Sheets connection."""
+import os
 import gspread
 from google.oauth2.service_account import Credentials
+from dotenv import load_dotenv
+
+# Загрузить переменные окружения
+load_dotenv()
 
 # Настройка credentials
 SCOPES = [
@@ -9,7 +14,7 @@ SCOPES = [
 ]
 
 creds = Credentials.from_service_account_file(
-    "service-account.json",
+    os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "service-account.json"),
     scopes=SCOPES,
 )
 
@@ -17,18 +22,25 @@ creds = Credentials.from_service_account_file(
 client = gspread.authorize(creds)
 
 # Открыть таблицу
-spreadsheet = client.open("Budget Assistant Data")
+spreadsheet_id = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
+spreadsheet_name = os.getenv("GOOGLE_SHEETS_SPREADSHEET_NAME", "Budget Assistant Data")
+
+if spreadsheet_id:
+    spreadsheet = client.open_by_key(spreadsheet_id)
+else:
+    spreadsheet = client.open(spreadsheet_name)
 print(f"✅ Подключено к таблице: {spreadsheet.title}")
 print(f"   URL: {spreadsheet.url}")
 
-# Получить или создать лист
+# Получить лист (не создаем, используем существующий)
+worksheet_name = "Траты и бюджет"
 try:
-    worksheet = spreadsheet.worksheet("Расходы")
+    worksheet = spreadsheet.worksheet(worksheet_name)
     print(f"✅ Найден лист: {worksheet.title}")
 except gspread.WorksheetNotFound:
-    worksheet = spreadsheet.add_worksheet("Расходы", rows=1000, cols=4)
-    worksheet.append_row(["Дата", "Категория", "Описание", "Сумма"])
-    print(f"✅ Создан новый лист: {worksheet.title}")
+    print(f"❌ ОШИБКА: Лист '{worksheet_name}' не найден!")
+    print(f"   Создайте лист '{worksheet_name}' с колонками: Дата | Категория | Расшифровка | Сумма")
+    exit(1)
 
 # Добавить тестовую запись
 from datetime import datetime

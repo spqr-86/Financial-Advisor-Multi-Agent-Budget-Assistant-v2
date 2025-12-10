@@ -8,6 +8,7 @@ services:
     container_name: budget-mcp
     ports:
       - "8082:8082"
+      - "8083:8083"
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-latest}
@@ -15,6 +16,9 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/service-account.json
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ENVIRONMENT=development
+      - MCP_TRANSPORT=${MCP_TRANSPORT:-both}
+      - MCP_SSE_HOST=0.0.0.0
+      - MCP_SSE_PORT=8083
     volumes:
       - ./service-account.json:/app/service-account.json:ro
       - ./prompts:/app/prompts:ro
