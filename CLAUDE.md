@@ -179,6 +179,26 @@ poetry run ruff check src/
 poetry run ruff format src/
 ```
 
+### Git Commits
+
+**IMPORTANT:** Do NOT add "🤖 Generated with Claude Code" or similar footer to commit messages in this project.
+
+```bash
+# Standard commit message format
+git commit -m "type: brief description
+
+Optional longer explanation of the change
+"
+
+# Example
+git commit -m "fix: update test_sheets.py to use environment variables
+
+- Load settings from .env using python-dotenv
+- Use correct worksheet name 'Траты и бюджет'
+- Match production code behavior
+"
+```
+
 ### Docker
 
 ```bash
