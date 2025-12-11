@@ -9,7 +9,8 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 from aiohttp import web
 
 from src.bot.config import settings
-from src.bot.handlers import router
+from src.bot.handlers import callbacks, commands
+from src.bot.handlers import router as main_router
 from src.bot.middlewares import APIClientMiddleware
 from src.core.http_client import ServiceClient
 
@@ -31,7 +32,11 @@ def create_app() -> web.Application:
 
     # Initialize dispatcher
     dp = Dispatcher()
-    dp.include_router(router)
+
+    # Register routers (order matters: commands, callbacks, main)
+    dp.include_router(commands.router)
+    dp.include_router(callbacks.router)
+    dp.include_router(main_router)
 
     # Setup API client middleware
     api_client = ServiceClient(
@@ -40,6 +45,7 @@ def create_app() -> web.Application:
         max_retries=3,
     )
     dp.message.middleware(APIClientMiddleware(api_client))
+    dp.callback_query.middleware(APIClientMiddleware(api_client))
 
     # Create web app
     app = web.Application()

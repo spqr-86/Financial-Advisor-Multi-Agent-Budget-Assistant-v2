@@ -1,14 +1,15 @@
 """Bot handlers."""
 
-import logging
 import asyncio
+import logging
 
 from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 
-from src.core.http_client import ServiceClient
+from src.bot.keyboards import get_main_menu_keyboard
 from src.bot.utils import split_long_message
+from src.core.http_client import ServiceClient
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +24,24 @@ async def cmd_start(message: Message) -> None:
         return
 
     name = message.from_user.first_name or "друг"
+
+    welcome_text = (
+        f"👋 Привет, <b>{name}</b>!\n\n"
+        "Я <b>Budget Assistant v2.0</b> - твой личный помощник по финансам\n\n"
+        "🎯 <b>Что я умею:</b>\n"
+        "• Записываю расходы в Google Sheets\n"
+        "• Автоматически определяю категории\n"
+        "• Показываю статистику и аналитику\n"
+        "• Даю советы по экономии\n\n"
+        "📝 <b>Попробуй написать:</b>\n"
+        "<code>купил хлеб 50 рублей</code>\n\n"
+        "или используй кнопки ниже ⬇️"
+    )
+
     await message.answer(
-        f"Привет, {name}!\n\n"
-        "Я Budget Assistant v2.0\n\n"
-        "Напиши что-нибудь, и я обработаю!"
+        welcome_text,
+        parse_mode="HTML",
+        reply_markup=get_main_menu_keyboard(),
     )
 
 
@@ -40,7 +55,9 @@ async def handle_text(
         return
 
     user_id = str(message.from_user.id)
-    query_preview = message.text[:50] + "..." if len(message.text) > 50 else message.text
+    query_preview = (
+        message.text[:50] + "..." if len(message.text) > 50 else message.text
+    )
 
     if not api_client:
         logger.error(f"API client not configured for user {user_id}")
@@ -67,9 +84,28 @@ async def handle_text(
             f"{len(response)} chars in {len(message_chunks)} message(s)"
         )
 
+        # Detect if expense was added and show appropriate keyboard
+        # Simple heuristic: look for success indicators
+        from src.bot.keyboards import get_after_add_keyboard
+
+        show_after_add_keyboard = any(
+            keyword in response.lower()
+            for keyword in ["добавлен", "записал", "сохранил", "добавил"]
+        )
+
         # Send all chunks
         for i, chunk in enumerate(message_chunks):
-            await message.answer(chunk)
+            # Add keyboard only to the last message if expense was added
+            keyboard = None
+            if show_after_add_keyboard and i == len(message_chunks) - 1:
+                keyboard = get_after_add_keyboard()
+
+            await message.answer(
+                chunk,
+                parse_mode="HTML",
+                reply_markup=keyboard,
+            )
+
             # Small delay between messages to avoid rate limits
             if i < len(message_chunks) - 1:
                 await asyncio.sleep(0.5)
