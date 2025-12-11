@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Budget Assistant v2.0** is a Telegram-based AI financial management bot that tracks expenses and provides personalized financial advice. The project uses a microservices architecture with three independent services communicating via HTTP.
 
-**Current Status:** Iteration 9/10 - Cloud Run deployment complete; docker-compose for local dev, Secret Manager integration, deployment scripts, and comprehensive Cloud Run documentation.
+**Current Status:** Iteration 10/10 - UX/UI Phase 1 complete with interactive buttons, commands, and rich formatting. Cloud Run deployment active with full production setup.
 
 **Core Functionality:**
 - Accept expense descriptions from users via Telegram ("купил хлеб 50 рублей")
@@ -34,6 +34,11 @@ User (Telegram) → Bot (8080) → API Gateway (8081) → MCP Service (8082) →
 - Implements rate limiting (10 req/min per user)
 - Access control via TELEGRAM_ADMIN_IDS whitelist
 - Middleware stack: APIClientMiddleware → RateLimitMiddleware → AccessControlMiddleware → Handlers
+- **UX/UI (Iteration 10):** Interactive keyboards, HTML formatting, emoji categories, contextual buttons
+  - `keyboards/` - Inline and reply keyboards for user interactions
+  - `formatters/` - Message formatting with HTML and emoji
+  - `handlers/commands.py` - Bot commands (/help, /stats, /last, /delete, /examples)
+  - `handlers/callbacks.py` - Inline button callback handlers
 
 **2. API Gateway (Port 8081)** - `src/api/`
 - Validates requests using Pydantic models
@@ -258,6 +263,47 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 - Used in FastAPI lifespan handlers for clean Cloud Run deployment
 - Currently implemented directly in app.py files (may be refactored to use this utility)
 
+### Bot Keyboards (`src/bot/keyboards/`) - Iteration 10
+- **Inline keyboards** (`inline.py`): Interactive buttons attached to messages
+  - `get_main_menu_keyboard()` - Main menu after /start (Статистика, Последние, Примеры, Помощь)
+  - `get_after_add_keyboard()` - Actions after adding expense (Отменить, Еще один, Статистика)
+  - `get_stats_period_keyboard()` - Period selection (Неделя, Месяц, Год)
+  - `get_confirm_delete_keyboard()` - Deletion confirmation dialog
+  - `get_back_to_menu_keyboard()` - Simple back button
+- **Reply keyboards** (`reply.py`): Keyboard replacement buttons (Phase 2)
+  - `get_categories_keyboard()` - Category selection for /add command
+  - `get_amount_keyboard()` - Quick amount selection buttons
+- Pattern: All keyboard functions return `InlineKeyboardMarkup` or `ReplyKeyboardMarkup`
+- Usage: Pass as `reply_markup` parameter to `message.answer()`
+
+### Message Formatters (`src/bot/formatters/`) - Iteration 10
+- **HTML formatting** (`messages.py`): Rich text formatting with emoji and structure
+  - `CATEGORY_EMOJI` - Dict mapping categories to emoji (🍕 Еда, 🚗 Транспорт, etc.)
+  - `format_expense_added()` - Success message after adding expense
+  - `format_expenses_list()` - List of recent expenses with numbering
+  - `format_statistics()` - Statistics with progress bars (████████░░ 45%)
+  - `format_help_message()` - Interactive help with examples
+  - `format_examples_message()` - Usage examples grouped by action
+- Pattern: All format functions return HTML-formatted strings
+- Usage: Pass formatted text to `message.answer(text, parse_mode="HTML")`
+- Progress bars: Use filled blocks (█) and empty blocks (░) for visual percentage
+
+### Bot Command Handlers (`src/bot/handlers/`) - Iteration 10
+- **commands.py**: Slash command handlers
+  - `/help` - Interactive help with back button
+  - `/stats` - Statistics with period selection buttons
+  - `/last` - Recent 5 expenses with formatting
+  - `/delete` - Delete with confirmation keyboard
+  - `/examples` - Usage examples categorized by action
+- **callbacks.py**: Inline button callback handlers
+  - `back_to_menu` - Return to main menu
+  - `show_help`, `show_examples` - Display help/examples
+  - `show_stats`, `show_last` - Fetch and display data
+  - `confirm_delete`, `cancel_delete` - Handle deletion flow
+  - `stats_week`, `stats_month`, `stats_year` - Period-specific stats
+- Pattern: Commands use `@router.message(Command("name"))`, callbacks use `@router.callback_query(F.data == "action")`
+- All handlers require `api_client: ServiceClient` injected by middleware
+
 ## Storage Layer
 
 ### Interface (`src/mcp/storage/interface.py`)
@@ -300,6 +346,13 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 - **Middleware order matters:** APIClientMiddleware → RateLimitMiddleware → AccessControlMiddleware
 - **Long message handling (Iteration 8):** Use `split_long_message()` from `src/bot/utils.py` to split responses exceeding Telegram's 4096 character limit. Handler automatically splits and sends with 0.5s delay between chunks.
 - **Timeout handling (Iteration 8):** Catch `asyncio.TimeoutError` separately for user-friendly messages. HTTP client automatically retries with exponential backoff (1s, 2s, 4s).
+- **UX/UI patterns (Iteration 10):**
+  - Use `parse_mode="HTML"` for all formatted messages
+  - Import formatters from `src.bot.formatters` for consistent styling
+  - Add inline keyboards via `reply_markup=get_*_keyboard()` from `src.bot.keyboards`
+  - Register callback handlers in `callbacks.py` using `@router.callback_query(F.data == "action")`
+  - Always inject `api_client: ServiceClient` for handlers that need API access
+  - Use category emoji from `CATEGORY_EMOJI` dict for visual consistency
 
 ### API Gateway Development
 - **Always check MCP health:** Use `get_mcp_client().health_check()` in health endpoint
@@ -369,9 +422,9 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 | 7 | ✅ | Multi-Agent System with google-adk |
 | 8 | ✅ | Production Polish: timeouts, message splitting, logging, graceful shutdown |
 | **9** | **✅** | **Cloud Run Deployment: docker-compose, Secret Manager, deployment scripts** |
-| 10 | ⏳ | Production monitoring and metrics |
+| **10** | **✅** | **UX/UI Phase 1: Interactive buttons, commands, HTML formatting, emoji categories** |
 
-**Next Focus:** Iteration 10 - Production monitoring (Cloud Logging, Error Reporting, VPC networking, IaC with Terraform)
+**Next Focus:** UX/UI Phase 2 - Structured /add command with FSM, persistent menu, visualizations; Production monitoring (Cloud Logging, Error Reporting)
 
 ## CI/CD Pipeline
 
@@ -711,5 +764,6 @@ MCP_SSE_PORT=8083
 - `docs/REBUILD_PLAN.md` - Complete 10-iteration development plan
 - `docs/GOOGLE_CLOUD_SETUP.md` - Cloud deployment instructions
 - **`docs/CLOUD_RUN_OPERATIONS.md`** - Production operations guide (logs, monitoring, model switching)
+- **`docs/UX_UI_DESIGN.md`** - Full UX/UI design guide with 3-phase roadmap (keyboards, formatters, visualizations)
 - `.env.example` - Environment variables template
 - `README.md` - Project overview
