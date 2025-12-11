@@ -16,6 +16,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --platform managed \
     --region ${REGION} \
     --allow-unauthenticated \
+    --service-account cloud-run-sa@budjet-agent.iam.gserviceaccount.com \
     --port 8082 \
     --memory 1Gi \
     --cpu 1 \

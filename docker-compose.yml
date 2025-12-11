@@ -23,7 +23,7 @@ services:
       - ./service-account.json:/app/service-account.json:ro
       - ./prompts:/app/prompts:ro
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/health').read()"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -47,7 +47,7 @@ services:
       mcp:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health').read()"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -73,7 +73,7 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health').read()"]
       interval: 10s
       timeout: 5s
       retries: 3

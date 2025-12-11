@@ -18,6 +18,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --platform managed \
     --region ${REGION} \
     --allow-unauthenticated \
+    --service-account cloud-run-sa@budjet-agent.iam.gserviceaccount.com \
     --port 8080 \
     --memory 512Mi \
     --cpu 1 \
@@ -26,7 +27,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --min-instances 0 \
     --concurrency 100 \
     --set-secrets "TELEGRAM_BOT_TOKEN=telegram-bot-token:latest,WEBHOOK_SECRET=webhook-secret:latest" \
-    --set-env-vars "BUDGET_API_URL=${BUDGET_API_URL},TELEGRAM_ADMIN_IDS=${TELEGRAM_ADMIN_IDS:-},LOG_LEVEL=INFO,ENVIRONMENT=production" \
+    --set-env-vars "BUDGET_API_URL=${BUDGET_API_URL},LOG_LEVEL=INFO,ENVIRONMENT=production" \
     --project ${PROJECT_ID}
 
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} \

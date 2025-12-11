@@ -442,6 +442,38 @@ gcloud run logs tail budget-mcp --region ${GCP_REGION}
 
 ### Troubleshooting
 
+**Google Sheets access denied:**
+```bash
+# If you see "Failed to add expense: 'NoneType' object has no attribute 'worksheet'"
+# The service account needs access to your Google Sheets spreadsheet
+
+# 1. Get service account email:
+cat service-account.json | grep client_email
+
+# 2. Share your Google Sheets with this email (Editor permissions):
+#    Open spreadsheet → Share button → Add email → Editor role
+```
+
+**Service account issues (deleted default compute SA):**
+```bash
+# If deployment fails with "Permission 'iam.serviceaccounts.actAs' denied"
+# Create a custom service account for Cloud Run:
+
+gcloud iam service-accounts create cloud-run-sa \
+    --display-name="Cloud Run Service Account" \
+    --project=${GCP_PROJECT_ID}
+
+# Grant access to secrets:
+for secret in google-api-key service-account-json telegram-bot-token webhook-secret; do
+  gcloud secrets add-iam-policy-binding $secret \
+    --member="serviceAccount:cloud-run-sa@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor" \
+    --project=${GCP_PROJECT_ID}
+done
+
+# Update deployment scripts to use this SA (already done in scripts/deploy_*.sh)
+```
+
 **Bot not receiving messages:**
 ```bash
 # Check webhook status
@@ -455,12 +487,14 @@ curl "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook?url=https://b
 **MCP service errors (Gemini quota):**
 ```bash
 # Check logs for quota issues
-gcloud run logs tail budget-mcp --limit 50 | grep "🚨"
+gcloud run services logs read budget-mcp --limit=50 --region=${GCP_REGION} | grep -i "quota\|exhausted"
 
-# Switch model if quota exceeded
+# Switch model if quota exceeded (gemini-2.5-flash has only 5 req/min free tier!)
+# Recommended: gemini-2.0-flash (higher quota)
 gcloud run services update budget-mcp \
-    --set-env-vars "GEMINI_MODEL=gemini-2.5-flash" \
-    --region ${GCP_REGION}
+    --update-env-vars "GEMINI_MODEL=gemini-2.0-flash" \
+    --region ${GCP_REGION} \
+    --project ${GCP_PROJECT_ID}
 ```
 
 **Update secrets:**

@@ -10,7 +10,7 @@ COPY pyproject.toml poetry.lock ./
 
 # Install dependencies (no dev, no root package)
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-root --no-interaction
+    && poetry install --without dev --no-root --no-interaction
 
 # Copy only needed source files
 COPY src/__init__.py ./src/
