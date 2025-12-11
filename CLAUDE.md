@@ -201,6 +201,8 @@ git commit -m "fix: update test_sheets.py to use environment variables
 
 ### Docker
 
+**Important:** All Dockerfiles use `--without dev` flag for Poetry (not `--no-dev` which is deprecated in Poetry 1.2+).
+
 ```bash
 # Build images
 docker build -f docker/Dockerfile.bot -t budget-bot .
@@ -212,6 +214,8 @@ docker run -p 8082:8082 -e GOOGLE_API_KEY=xxx budget-mcp
 docker run -p 8081:8081 -e MCP_API_URL=http://host.docker.internal:8082 budget-api
 docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budget-bot
 ```
+
+**Health checks:** `docker-compose.yml` uses Python-based health checks (not curl, which isn't available in python:3.11-slim images).
 
 ## Core Patterns & Modules
 
@@ -345,7 +349,7 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 - `GOOGLE_API_KEY` - Gemini API key
 - `GOOGLE_APPLICATION_CREDENTIALS` - Path to service account JSON file
 - `GOOGLE_SHEETS_SPREADSHEET_ID` - Spreadsheet ID from Google Sheets URL
-- `GEMINI_MODEL` - Gemini model name (default: `gemini-flash-latest`). Use this to quickly switch models when quota exhausted.
+- `GEMINI_MODEL` - Gemini model name (default: `gemini-2.0-flash`, recommended). Use this to quickly switch models when quota exhausted. Avoid `gemini-2.5-flash` (only 5 req/min free tier).
 
 **Common (all services):**
 - `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
@@ -698,7 +702,7 @@ MCP_SSE_PORT=8083
 10. **Timeout errors (Iteration 8):** Always catch `asyncio.TimeoutError` separately from general exceptions for better user messages. HTTP client retries 3 times with exponential backoff.
 11. **Logging best practices (Iteration 8):** Always log user_id, request timing, and use `exc_info=True` for exceptions. Check `src/bot/handlers/__init__.py` for examples.
 12. **Graceful shutdown (Iteration 8):** Services handle SIGTERM/SIGINT for Cloud Run. Don't block shutdown in custom code.
-13. **Gemini API quota issues:** If bot times out (30s+) with no response, check MCP logs for `🚨 GEMINI API QUOTA EXCEEDED` message. **Quick fix:** Change `GEMINI_MODEL=gemini-flash-latest` in `.env` to another model (try `gemini-2.5-flash`, `gemini-pro-latest`, or `gemini-flash-lite-latest`), then restart MCP service. Check quota at https://ai.google.dev/gemini-api/docs/rate-limits. To see all available models: `poetry run python -c "from google import genai; client = genai.Client(); [print(m.name) for m in client.models.list() if 'gemini' in m.name.lower()]"`
+13. **Gemini API quota issues:** If bot times out (30s+) with no response, check MCP logs for quota exceeded errors. **Recommended:** Use `GEMINI_MODEL=gemini-2.0-flash` (15 req/min free tier). **Avoid:** `gemini-2.5-flash` (only 5 req/min). For Cloud Run deployment, use: `gcloud run services update budget-mcp --update-env-vars "GEMINI_MODEL=gemini-2.0-flash" --region us-central1 --project ${GCP_PROJECT_ID}`. See [Cloud Run Operations](docs/CLOUD_RUN_OPERATIONS.md) for details.
 
 ## Additional Documentation
 
@@ -706,5 +710,6 @@ MCP_SSE_PORT=8083
 - `docs/TESTING.md` - Testing strategies and manual test procedures
 - `docs/REBUILD_PLAN.md` - Complete 10-iteration development plan
 - `docs/GOOGLE_CLOUD_SETUP.md` - Cloud deployment instructions
+- **`docs/CLOUD_RUN_OPERATIONS.md`** - Production operations guide (logs, monitoring, model switching)
 - `.env.example` - Environment variables template
 - `README.md` - Project overview
