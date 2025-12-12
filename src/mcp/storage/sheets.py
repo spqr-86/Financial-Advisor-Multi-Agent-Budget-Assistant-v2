@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import partial
 from typing import Any
 
@@ -42,20 +42,25 @@ class GoogleSheetsStorage(StorageInterface):
 
         try:
             # Support both file path (local) and JSON string (Cloud Run)
-            if settings.google_application_credentials.startswith('{'):
+            credentials_source = settings.credentials_source
+
+            if credentials_source.startswith('{'):
                 # JSON string from Secret Manager
                 import json
-                creds_dict = json.loads(settings.google_application_credentials)
+                creds_dict = json.loads(credentials_source)
                 creds = Credentials.from_service_account_info(
                     creds_dict,
                     scopes=SCOPES,
                 )
+                logger.info("Connected to Google Sheets using JSON credentials")
             else:
                 # File path (local dev)
                 creds = Credentials.from_service_account_file(
-                    settings.google_application_credentials,
+                    credentials_source,
                     scopes=SCOPES,
                 )
+                logger.info(f"Connected to Google Sheets using file: {credentials_source}")
+
             self._client = gspread.authorize(creds)
 
             # Find or create spreadsheet
@@ -239,6 +244,19 @@ class GoogleSheetsStorage(StorageInterface):
             # Skip header row
             rows = all_values[1:]
 
+            # Calculate date range based on period
+            now = datetime.now()
+            if period == "day":
+                start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif period == "week":
+                start_date = now - timedelta(days=7)
+            elif period == "month":
+                start_date = now - timedelta(days=30)
+            elif period == "year":
+                start_date = now - timedelta(days=365)
+            else:
+                start_date = None  # All time
+
             # Calculate statistics by category
             stats_by_category: dict[str, float] = {}
             total = 0.0
@@ -247,9 +265,24 @@ class GoogleSheetsStorage(StorageInterface):
                 if len(row) < 4:
                     continue
 
+                # Parse date (format: DD.MM.YYYY)
+                date_str = row[0] if len(row) > 0 else ""
+                if start_date and date_str:
+                    try:
+                        row_date = datetime.strptime(date_str, "%d.%m.%Y")
+                        if row_date < start_date:
+                            continue  # Skip rows outside period
+                    except ValueError:
+                        pass  # Include rows with invalid dates
+
                 category = row[1] if len(row) > 1 else "Unknown"
+
+                # Parse amount - handle both comma and dot as decimal separator
                 try:
-                    amount = float(row[3]) if len(row) > 3 else 0.0
+                    amount_str = row[3] if len(row) > 3 else "0"
+                    # Replace comma with dot and remove currency symbols
+                    amount_str = amount_str.replace(",", ".").replace("₽", "").replace(" ", "").strip()
+                    amount = float(amount_str) if amount_str else 0.0
                 except (ValueError, TypeError):
                     amount = 0.0
 

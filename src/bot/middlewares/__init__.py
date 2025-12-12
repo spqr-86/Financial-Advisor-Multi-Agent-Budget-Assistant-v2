@@ -3,7 +3,7 @@
 from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware
-from aiogram.types import Message
+from aiogram.types import TelegramObject
 
 from src.core.http_client import ServiceClient
 
@@ -16,8 +16,8 @@ class APIClientMiddleware(BaseMiddleware):
 
     async def __call__(
         self,
-        handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
-        event: Message,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
         data["api_client"] = self.api_client
@@ -37,13 +37,13 @@ class RateLimitMiddleware(BaseMiddleware):
 
     async def __call__(
         self,
-        handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
-        event: Message,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
         from datetime import datetime
 
-        if not event.from_user:
+        if not hasattr(event, 'from_user') or not event.from_user:
             return await handler(event, data)
 
         user_id = event.from_user.id
@@ -57,7 +57,8 @@ class RateLimitMiddleware(BaseMiddleware):
 
         # Check limit
         if len(self.requests[user_id]) >= self.limit:
-            await event.answer("Подождите минуту...")
+            if hasattr(event, 'answer'):
+                await event.answer("Подождите минуту...")
             return None
 
         self.requests[user_id].append(now)
@@ -72,16 +73,17 @@ class AccessControlMiddleware(BaseMiddleware):
 
     async def __call__(
         self,
-        handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
-        event: Message,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        if not event.from_user:
+        if not hasattr(event, 'from_user') or not event.from_user:
             return None
 
         # If admin_ids is empty, allow everyone
         if self.admin_ids and event.from_user.id not in self.admin_ids:
-            await event.answer("Доступ ограничен")
+            if hasattr(event, 'answer'):
+                await event.answer("Доступ ограничен")
             return None
 
         return await handler(event, data)
