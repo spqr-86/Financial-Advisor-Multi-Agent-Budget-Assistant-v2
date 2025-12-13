@@ -3,6 +3,7 @@
 import logging
 
 from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
 from src.bot.formatters import (
@@ -17,6 +18,8 @@ from src.bot.keyboards.inline import (
     get_main_menu_keyboard,
     get_stats_period_keyboard,
 )
+from src.bot.keyboards.reply import get_categories_keyboard
+from src.bot.states import AddExpenseStates
 from src.core.http_client import ServiceClient
 
 logger = logging.getLogger(__name__)
@@ -280,18 +283,25 @@ async def callback_delete_last(
 
 
 @router.callback_query(F.data == "add_more")
-async def callback_add_more(callback: CallbackQuery) -> None:
-    """Handle add more expense button."""
+async def callback_add_more(callback: CallbackQuery, state: FSMContext) -> None:
+    """Handle add more expense button - start structured /add flow."""
     if not callback.message:
         return
 
-    await callback.message.edit_text(
-        "➕ <b>Добавить еще расход</b>\n\n"
-        "Напишите что-нибудь вроде:\n"
-        "<code>купил кофе 150</code>",
+    # Start FSM flow for adding expense
+    await state.set_state(AddExpenseStates.category)
+
+    # Delete the previous message (with inline keyboard)
+    await callback.message.delete()
+
+    # Send new message with reply keyboard
+    await callback.message.answer(
+        "💰 <b>Добавление расхода</b>\n\n"
+        "📂 <b>Шаг 1/3:</b> Выбери категорию",
         parse_mode="HTML",
-        reply_markup=get_back_to_menu_keyboard(),
+        reply_markup=get_categories_keyboard(),
     )
+
     await callback.answer()
 
 

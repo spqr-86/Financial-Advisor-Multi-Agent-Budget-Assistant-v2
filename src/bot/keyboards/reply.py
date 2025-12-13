@@ -1,13 +1,10 @@
-"""Reply keyboards for the bot (for structured input in future phases)."""
+"""Reply keyboards for the bot."""
 
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 
 def get_categories_keyboard() -> ReplyKeyboardMarkup:
-    """Get keyboard for selecting expense category.
-
-    Note: This will be used in Phase 2 for /add command with FSM.
-    """
+    """Get keyboard for selecting expense category."""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -32,10 +29,7 @@ def get_categories_keyboard() -> ReplyKeyboardMarkup:
 
 
 def get_amount_keyboard() -> ReplyKeyboardMarkup:
-    """Get keyboard for quick amount selection.
-
-    Note: This will be used in Phase 2 for /add command with FSM.
-    """
+    """Get keyboard for quick amount selection."""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -54,3 +48,8 @@ def get_amount_keyboard() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
         one_time_keyboard=True,
     )
+
+
+def remove_keyboard() -> ReplyKeyboardRemove:
+    """Remove reply keyboard."""
+    return ReplyKeyboardRemove()

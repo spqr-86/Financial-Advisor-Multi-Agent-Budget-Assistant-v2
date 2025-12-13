@@ -395,24 +395,27 @@ def get_categories_keyboard():
 
 ## 📈 9. Приоритеты внедрения
 
-### Фаза 1: Основы (Iteration 10?)
+### Фаза 1: Основы (Iteration 10) ✅
 - ✅ Команды (/help, /stats, /last, /delete)
 - ✅ Улучшенные текстовые сообщения
 - ✅ Форматирование (HTML/Markdown)
 - ✅ Эмодзи для категорий
 - ✅ Inline keyboards после действий
+- ✅ Progress bars в статистике
 
-### Фаза 2: Интерактив (Iteration 11?)
-- ⏳ /add с FSM и Reply keyboards
-- ⏳ Persistent menu (BotFather)
-- ⏳ Callback handlers для кнопок
-- ⏳ Progress bars в статистике
+### Фаза 2: Интерактив (Iteration 11) ✅
+- ✅ /add с FSM и Reply keyboards
+- ✅ Пошаговый ввод (категория → сумма → описание)
+- ✅ Callback handlers для кнопок "Еще один"
+- ✅ Отмена на каждом шаге FSM
+- ✅ BotFather configuration guide (commands menu)
+- ℹ️ Persistent menu (ограничение Telegram API - требует Mini App)
 
 ### Фаза 3: Визуализация (Iteration 12?)
-- ⏳ Графики matplotlib
-- ⏳ Экспорт данных
-- ⏳ Бюджет и лимиты
-- ⏳ Уведомления
+- ⏳ Графики matplotlib (круговая диаграмма, линейный график)
+- ⏳ Экспорт данных в CSV/Excel
+- ⏳ Бюджет и лимиты по категориям
+- ⏳ Уведомления о превышении бюджета
 
 ---
 

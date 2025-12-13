@@ -8,7 +8,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from src.bot.config import settings
-from src.bot.handlers import callbacks, commands
+from src.bot.handlers import callbacks, commands, structured
 from src.bot.handlers import router as main_router
 from src.bot.middlewares import APIClientMiddleware
 from src.core.http_client import ServiceClient
@@ -32,7 +32,9 @@ async def main():
     # Initialize dispatcher
     dp = Dispatcher()
 
-    # Register routers (order matters: commands, callbacks, main)
+    # Register routers (order matters: structured, commands, callbacks, main)
+    # structured router must be first to handle /add command and FSM states
+    dp.include_router(structured.router)
     dp.include_router(commands.router)
     dp.include_router(callbacks.router)
     dp.include_router(main_router)

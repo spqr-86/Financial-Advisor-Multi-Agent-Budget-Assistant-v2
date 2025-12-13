@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Budget Assistant v2.0** is a Telegram-based AI financial management bot that tracks expenses and provides personalized financial advice. The project uses a microservices architecture with three independent services communicating via HTTP.
 
-**Current Status:** Iteration 10/10 - UX/UI Phase 1 complete with interactive buttons, commands, and rich formatting. Cloud Run deployment active with full production setup.
+**Current Status:** Iteration 11 (UX/UI Phase 2) - Structured /add command with FSM, reply keyboards, and step-by-step expense flow. Phase 1 complete with interactive buttons, commands, and rich formatting. Cloud Run deployment active with full production setup.
 
 **Core Functionality:**
 - Accept expense descriptions from users via Telegram ("купил хлеб 50 рублей")
@@ -34,11 +34,13 @@ User (Telegram) → Bot (8080) → API Gateway (8081) → MCP Service (8082) →
 - Implements rate limiting (10 req/min per user)
 - Access control via TELEGRAM_ADMIN_IDS whitelist
 - Middleware stack: APIClientMiddleware → RateLimitMiddleware → AccessControlMiddleware → Handlers
-- **UX/UI (Iteration 10):** Interactive keyboards, HTML formatting, emoji categories, contextual buttons
+- **UX/UI (Iteration 10-11):** Interactive keyboards, HTML formatting, emoji categories, contextual buttons, FSM-based structured input
   - `keyboards/` - Inline and reply keyboards for user interactions
   - `formatters/` - Message formatting with HTML and emoji
   - `handlers/commands.py` - Bot commands (/help, /stats, /last, /delete, /examples)
   - `handlers/callbacks.py` - Inline button callback handlers
+  - `handlers/structured.py` - FSM-based /add command with step-by-step flow (Iteration 11)
+  - `states.py` - FSM state definitions for structured conversations
 
 **2. API Gateway (Port 8081)** - `src/api/`
 - Validates requests using Pydantic models
@@ -346,13 +348,21 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 - **Middleware order matters:** APIClientMiddleware → RateLimitMiddleware → AccessControlMiddleware
 - **Long message handling (Iteration 8):** Use `split_long_message()` from `src/bot/utils.py` to split responses exceeding Telegram's 4096 character limit. Handler automatically splits and sends with 0.5s delay between chunks.
 - **Timeout handling (Iteration 8):** Catch `asyncio.TimeoutError` separately for user-friendly messages. HTTP client automatically retries with exponential backoff (1s, 2s, 4s).
-- **UX/UI patterns (Iteration 10):**
+- **UX/UI patterns (Iteration 10-11):**
   - Use `parse_mode="HTML"` for all formatted messages
   - Import formatters from `src.bot.formatters` for consistent styling
   - Add inline keyboards via `reply_markup=get_*_keyboard()` from `src.bot.keyboards`
   - Register callback handlers in `callbacks.py` using `@router.callback_query(F.data == "action")`
   - Always inject `api_client: ServiceClient` for handlers that need API access
   - Use category emoji from `CATEGORY_EMOJI` dict for visual consistency
+- **FSM (Finite State Machine) patterns (Iteration 11):**
+  - Define states in `src/bot/states.py` using `StatesGroup` and `State`
+  - Use `StateFilter` to match specific states in handlers
+  - Access state data with `state.get_data()` and update with `state.update_data(key=value)`
+  - Clear state after completing flow with `await state.clear()`
+  - Reply keyboards (`get_categories_keyboard()`, `get_amount_keyboard()`) used during FSM flows
+  - Remove reply keyboard after FSM completes with `remove_keyboard()`
+  - Register FSM router FIRST in dispatcher (before commands/callbacks) to intercept state-specific messages
 
 ### API Gateway Development
 - **Always check MCP health:** Use `get_mcp_client().health_check()` in health endpoint
@@ -408,7 +418,7 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 - `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
 - `ENVIRONMENT` - Environment name (development, production)
 
-## Development Roadmap (10 Iterations)
+## Development Roadmap
 
 | Iteration | Status | Focus |
 |-----------|--------|-------|
@@ -421,10 +431,11 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 | 6 | ✅ | AI Agent v1 with Gemini |
 | 7 | ✅ | Multi-Agent System with google-adk |
 | 8 | ✅ | Production Polish: timeouts, message splitting, logging, graceful shutdown |
-| **9** | **✅** | **Cloud Run Deployment: docker-compose, Secret Manager, deployment scripts** |
-| **10** | **✅** | **UX/UI Phase 1: Interactive buttons, commands, HTML formatting, emoji categories** |
+| 9 | ✅ | Cloud Run Deployment: docker-compose, Secret Manager, deployment scripts |
+| 10 | ✅ | UX/UI Phase 1: Interactive buttons, commands, HTML formatting, emoji categories |
+| **11** | **✅** | **UX/UI Phase 2: Structured /add with FSM, reply keyboards, step-by-step flow** |
 
-**Next Focus:** UX/UI Phase 2 - Structured /add command with FSM, persistent menu, visualizations; Production monitoring (Cloud Logging, Error Reporting)
+**Next Focus:** UX/UI Phase 3 - Visualizations (matplotlib charts), budget limits, data export; Production monitoring (Cloud Logging, Error Reporting)
 
 ## CI/CD Pipeline
 
