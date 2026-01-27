@@ -126,11 +126,16 @@ class GoogleSheetsStorage(StorageInterface):
             expense_date = date or datetime.now()
             date_str = expense_date.strftime("%d.%m.%Y")
 
-            # Find the first empty row in column A
-            # (append_row finds the first empty row for the WHOLE sheet,
-            # which is wrong if there's data in other columns like F:H)
-            all_col_a = await self._run_sync(worksheet.col_values, 1)
-            next_row = len(all_col_a) + 1
+            # Find the first empty row in column A using a more efficient way
+            # We use get_all_values() which is often cached or more efficient for smaller sheets
+            all_values = await self._run_sync(worksheet.get_all_values)
+
+            # Find first row where column A is empty
+            next_row = len(all_values) + 1
+            for i, row in enumerate(all_values):
+                if not row or not row[0]:
+                    next_row = i + 1
+                    break
 
             # Append row: Дата, Категория, Расшифровка, Сумма
             # Using update instead of append_row to target specific row in columns A:D
@@ -427,9 +432,14 @@ class GoogleSheetsStorage(StorageInterface):
 
             # Single API call for all valid rows
             if rows_to_add:
-                # Find the first empty row in column A
-                all_col_a = await self._run_sync(worksheet.col_values, 1)
-                next_row = len(all_col_a) + 1
+                # Find the first empty row in column A efficiently
+                all_values = await self._run_sync(worksheet.get_all_values)
+                next_row = len(all_values) + 1
+                for i, row in enumerate(all_values):
+                    if not row or not row[0]:
+                        next_row = i + 1
+                        break
+
                 end_row = next_row + len(rows_to_add) - 1
 
                 # Using update instead of append_rows to target specific columns A:D
