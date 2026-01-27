@@ -127,3 +127,39 @@ async def delete_last_expense_direct(
     from src.mcp.agents.tools.sheets import delete_last_expense_tool
 
     return await delete_last_expense_tool(user_id=user_id)
+
+
+async def add_expenses_batch_direct(
+    expenses: list[dict],
+    user_id: str = "default"
+) -> dict[str, Any]:
+    """
+    Массовое добавление расходов напрямую (без AI обработки).
+
+    Args:
+        expenses: Список расходов
+        user_id: ID пользователя
+
+    Returns:
+        Результат с детальным отчётом
+    """
+    from src.mcp.storage.sheets import GoogleSheetsStorage
+
+    storage = GoogleSheetsStorage()
+    result = await storage.add_expenses_batch(
+        user_id=user_id,
+        expenses=expenses
+    )
+
+    # Determine overall status
+    if result["failed"] == 0:
+        status = "success"
+    elif result["added"] == 0:
+        status = "error"
+    else:
+        status = "partial"
+
+    return {
+        "status": status,
+        **result
+    }
