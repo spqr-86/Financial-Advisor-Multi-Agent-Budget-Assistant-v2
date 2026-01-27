@@ -7,19 +7,20 @@ AI-powered Telegram bot for personal finance management using multi-agent archit
 Budget Assistant is an intelligent financial management bot that helps track expenses through natural language conversations in Telegram. It uses Google's Gemini AI with a multi-agent system to understand your spending patterns, categorize expenses automatically, and provide financial insights.
 
 **Key Features:**
-- =� Natural language expense tracking (":C?8; E;51 50 @C1;59")
-- > Multi-agent AI system with specialized agents (Orchestrator, Registrar, Analyst)
-- =� Automatic categorization and Google Sheets integration
-- =� Expense statistics and analysis
-- = User access control
--  Cloud-native deployment on Google Cloud Run
+- 💬 Natural language expense tracking ("купил хлеб 50 рублей")
+- 🤖 Multi-agent AI system with specialized agents (Orchestrator, Registrar, Analyst)
+- 📊 Automatic categorization and Google Sheets integration
+- 📈 Expense statistics and analysis
+- 🔒 User access control
+- ☁️ Cloud-native deployment on Google Cloud Run
+- ⚡ Interactive UI with keyboards, buttons, and rich formatting (Iteration 10-11)
 
 ## Architecture
 
 The project uses a **microservices architecture** with three independent services:
 
 ```
-User (Telegram) � Bot (8080) � API Gateway (8081) � MCP Service (8082) � Google Sheets
+User (Telegram) → Bot (8080) → API Gateway (8081) → MCP Service (8082) → Google Sheets
 ```
 
 - **Telegram Bot** - Handles user interactions, rate limiting, access control
@@ -69,6 +70,7 @@ export GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
 - **[Google Cloud Setup](docs/GOOGLE_CLOUD_SETUP.md)** - Cloud deployment instructions
 - **[Testing Guide](docs/TESTING.md)** - Testing strategies and procedures
 - **[Code Guide](docs/CODE_GUIDE.md)** - Beginner-friendly architecture guide (Russian)
+- **[UX/UI Design](docs/UX_UI_DESIGN.md)** - Interactive UI design guide
 
 ## Tech Stack
 
@@ -84,15 +86,17 @@ export GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
 
 ## Project Status
 
-**Current**: Iteration 9/10 - Production deployment complete
+**Current**: Iteration 11 - UX/UI Phase 2 complete
 
--  Microservices architecture (3 services)
--  Multi-agent AI system with google-adk
--  Google Sheets integration
--  Cloud Run deployment with Docker
--  Secret Manager integration
--  Production polish (timeouts, logging, graceful shutdown)
-- � Monitoring and metrics (Iteration 10)
+- ✅ Microservices architecture (3 services)
+- ✅ Multi-agent AI system with google-adk
+- ✅ Google Sheets integration
+- ✅ Cloud Run deployment with Docker
+- ✅ Secret Manager integration
+- ✅ Production polish (timeouts, logging, graceful shutdown)
+- ✅ Interactive UI Phase 1 (keyboards, buttons, HTML formatting)
+- ✅ Interactive UI Phase 2 (FSM-based structured input with reply keyboards)
+- 🔄 Monitoring and visualizations (Phase 3)
 
 ## Requirements
 
