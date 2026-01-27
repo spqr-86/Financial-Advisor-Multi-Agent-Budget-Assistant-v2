@@ -31,9 +31,7 @@ class GoogleSheetsStorage(StorageInterface):
     async def _run_sync(self, func, *args, **kwargs):
         """Run synchronous function in executor."""
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, partial(func, *args, **kwargs)
-        )
+        return await loop.run_in_executor(None, partial(func, *args, **kwargs))
 
     async def _connect(self) -> None:
         """Connect to Google Sheets."""
@@ -44,9 +42,10 @@ class GoogleSheetsStorage(StorageInterface):
             # Support both file path (local) and JSON string (Cloud Run)
             credentials_source = settings.credentials_source
 
-            if credentials_source.startswith('{'):
+            if credentials_source.startswith("{"):
                 # JSON string from Secret Manager
                 import json
+
                 creds_dict = json.loads(credentials_source)
                 creds = Credentials.from_service_account_info(
                     creds_dict,
@@ -59,29 +58,28 @@ class GoogleSheetsStorage(StorageInterface):
                     credentials_source,
                     scopes=SCOPES,
                 )
-                logger.info(f"Connected to Google Sheets using file: {credentials_source}")
+                logger.info(
+                    f"Connected to Google Sheets using file: {credentials_source}"
+                )
 
             self._client = gspread.authorize(creds)
 
             # Find or create spreadsheet
             if settings.google_sheets_spreadsheet_id:
                 self._spreadsheet = await self._run_sync(
-                    self._client.open_by_key,
-                    settings.google_sheets_spreadsheet_id
+                    self._client.open_by_key, settings.google_sheets_spreadsheet_id
                 )
             else:
                 try:
                     self._spreadsheet = await self._run_sync(
-                        self._client.open,
-                        settings.google_sheets_spreadsheet_name
+                        self._client.open, settings.google_sheets_spreadsheet_name
                     )
                 except gspread.SpreadsheetNotFound:
                     logger.info(
                         f"Creating new spreadsheet: {settings.google_sheets_spreadsheet_name}"
                     )
                     self._spreadsheet = await self._run_sync(
-                        self._client.create,
-                        settings.google_sheets_spreadsheet_name
+                        self._client.create, settings.google_sheets_spreadsheet_name
                     )
 
             logger.info(f"Connected to spreadsheet: {self._spreadsheet.title}")
@@ -98,13 +96,14 @@ class GoogleSheetsStorage(StorageInterface):
 
         try:
             worksheet = await self._run_sync(
-                self._spreadsheet.worksheet,
-                worksheet_name
+                self._spreadsheet.worksheet, worksheet_name
             )
             logger.info(f"Using worksheet: {worksheet_name}")
         except gspread.WorksheetNotFound:
             logger.error(f"Worksheet '{worksheet_name}' not found!")
-            raise ValueError(f"Worksheet '{worksheet_name}' does not exist in the spreadsheet")
+            raise ValueError(
+                f"Worksheet '{worksheet_name}' does not exist in the spreadsheet"
+            )
 
         return worksheet
 
@@ -127,15 +126,21 @@ class GoogleSheetsStorage(StorageInterface):
             expense_date = date or datetime.now()
             date_str = expense_date.strftime("%d.%m.%Y")
 
+            # Find the first empty row in column A
+            # (append_row finds the first empty row for the WHOLE sheet,
+            # which is wrong if there's data in other columns like F:H)
+            all_col_a = await self._run_sync(worksheet.col_values, 1)
+            next_row = len(all_col_a) + 1
+
             # Append row: Дата, Категория, Расшифровка, Сумма
+            # Using update instead of append_row to target specific row in columns A:D
             await self._run_sync(
-                worksheet.append_row,
-                [date_str, category, description, amount]
+                worksheet.update,
+                f"A{next_row}:D{next_row}",
+                [[date_str, category, description, amount]],
             )
 
-            logger.info(
-                f"Added expense for user {user_id}: {category} - {amount}"
-            )
+            logger.info(f"Added expense for user {user_id}: {category} - {amount}")
 
             return {
                 "status": "success",
@@ -281,7 +286,12 @@ class GoogleSheetsStorage(StorageInterface):
                 try:
                     amount_str = row[3] if len(row) > 3 else "0"
                     # Replace comma with dot and remove currency symbols
-                    amount_str = amount_str.replace(",", ".").replace("₽", "").replace(" ", "").strip()
+                    amount_str = (
+                        amount_str.replace(",", ".")
+                        .replace("₽", "")
+                        .replace(" ", "")
+                        .strip()
+                    )
                     amount = float(amount_str) if amount_str else 0.0
                 except (ValueError, TypeError):
                     amount = 0.0
@@ -340,14 +350,9 @@ class GoogleSheetsStorage(StorageInterface):
             }
 
             # Delete the last row
-            await self._run_sync(
-                worksheet.delete_rows,
-                last_row_number
-            )
+            await self._run_sync(worksheet.delete_rows, last_row_number)
 
-            logger.info(
-                f"Deleted last expense for user {user_id}: {deleted_expense}"
-            )
+            logger.info(f"Deleted last expense for user {user_id}: {deleted_expense}")
 
             return {
                 "status": "success",
@@ -372,11 +377,27 @@ class GoogleSheetsStorage(StorageInterface):
             worksheet = await self._get_worksheet()
 
             VALID_CATEGORIES = {
-                "Аренда", "Детский сад", "Продукты", "Транспорт", "Еда",
-                "Прочее", "Алкоголь", "Здоровье, красота, гигиена", "Спорт",
-                "Творчество, книги, обучение", "WB", "Яндекс.Маркет",
-                "Подписки", "Коммуналка", "Кино, театры, музеи", "Одежда",
-                "Подарки", "Связь", "Рестораны", "Кредит", "Кредитка"
+                "Аренда",
+                "Детский сад",
+                "Продукты",
+                "Транспорт",
+                "Еда",
+                "Прочее",
+                "Алкоголь",
+                "Здоровье, красота, гигиена",
+                "Спорт",
+                "Творчество, книги, обучение",
+                "WB",
+                "Яндекс.Маркет",
+                "Подписки",
+                "Коммуналка",
+                "Кино, театры, музеи",
+                "Одежда",
+                "Подарки",
+                "Связь",
+                "Рестораны",
+                "Кредит",
+                "Кредитка",
             }
 
             rows_to_add = []
@@ -402,15 +423,19 @@ class GoogleSheetsStorage(StorageInterface):
                     rows_to_add.append([date_str, category, description, amount])
 
                 except Exception as e:
-                    errors.append({
-                        "index": i,
-                        "expense": exp,
-                        "error": str(e)
-                    })
+                    errors.append({"index": i, "expense": exp, "error": str(e)})
 
             # Single API call for all valid rows
             if rows_to_add:
-                await self._run_sync(worksheet.append_rows, rows_to_add)
+                # Find the first empty row in column A
+                all_col_a = await self._run_sync(worksheet.col_values, 1)
+                next_row = len(all_col_a) + 1
+                end_row = next_row + len(rows_to_add) - 1
+
+                # Using update instead of append_rows to target specific columns A:D
+                await self._run_sync(
+                    worksheet.update, f"A{next_row}:D{end_row}", rows_to_add
+                )
 
             logger.info(
                 f"Batch added {len(rows_to_add)} expenses for user {user_id}, "
@@ -421,7 +446,7 @@ class GoogleSheetsStorage(StorageInterface):
                 "added": len(rows_to_add),
                 "failed": len(errors),
                 "total": len(expenses),
-                "errors": errors
+                "errors": errors,
             }
 
         except Exception as e:
@@ -430,7 +455,7 @@ class GoogleSheetsStorage(StorageInterface):
                 "added": 0,
                 "failed": len(expenses),
                 "total": len(expenses),
-                "errors": [{"error": str(e)}]
+                "errors": [{"error": str(e)}],
             }
 
     async def health_check(self) -> dict[str, Any]:
