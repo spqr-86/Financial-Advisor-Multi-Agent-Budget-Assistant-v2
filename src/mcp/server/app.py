@@ -123,6 +123,40 @@ async def delete_last_expense(user_id: str = "default") -> dict:
     return await tools.delete_last_expense_direct(user_id=user_id)
 
 
+@mcp.tool()
+async def add_expenses_batch(
+    expenses: list[dict],
+    user_id: str = "default"
+) -> dict:
+    """
+    Массовое добавление расходов (для импорта банковских выписок).
+
+    Используйте этот tool для добавления множества расходов за один раз,
+    например при импорте банковской выписки или загрузке истории расходов.
+
+    Args:
+        expenses: Список расходов, каждый содержит:
+            - category: str (Продукты, Транспорт, Рестораны, Развлечения, ЖКХ, Одежда, Здоровье, Прочее)
+            - amount: float (сумма в рублях)
+            - description: str (описание покупки)
+            - date: str (опционально, формат "DD.MM.YYYY", по умолчанию текущая дата)
+        user_id: ID пользователя (опционально)
+
+    Returns:
+        {
+            "status": "success" | "partial" | "error",
+            "added": количество успешно добавленных расходов,
+            "failed": количество неудачных попыток,
+            "total": общее количество,
+            "errors": список ошибок с индексами (если есть)
+        }
+    """
+    return await tools.add_expenses_batch_direct(
+        expenses=expenses,
+        user_id=user_id
+    )
+
+
 # === RESOURCES ===
 
 

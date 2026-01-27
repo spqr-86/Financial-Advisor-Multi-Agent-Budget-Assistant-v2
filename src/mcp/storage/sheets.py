@@ -362,6 +362,74 @@ class GoogleSheetsStorage(StorageInterface):
                 "error": str(e),
             }
 
+    async def add_expenses_batch(
+        self,
+        user_id: str,
+        expenses: list[dict],
+    ) -> dict[str, Any]:
+        """Add multiple expenses using batch API."""
+        try:
+            worksheet = await self._get_worksheet()
+
+            VALID_CATEGORIES = {
+                "Продукты", "Транспорт", "Рестораны",
+                "Развлечения", "ЖКХ", "Одежда", "Здоровье", "Прочее"
+            }
+
+            rows_to_add = []
+            errors = []
+
+            # Validate and prepare rows in memory
+            for i, exp in enumerate(expenses):
+                try:
+                    # Category validation with auto-fallback
+                    category = exp.get("category", "Прочее")
+                    if category not in VALID_CATEGORIES:
+                        category = "Прочее"
+
+                    # Date handling
+                    date_str = exp.get("date")
+                    if not date_str:
+                        date_str = datetime.now().strftime("%d.%m.%Y")
+
+                    # Required fields
+                    amount = float(exp["amount"])
+                    description = exp.get("description", "")
+
+                    rows_to_add.append([date_str, category, description, amount])
+
+                except Exception as e:
+                    errors.append({
+                        "index": i,
+                        "expense": exp,
+                        "error": str(e)
+                    })
+
+            # Single API call for all valid rows
+            if rows_to_add:
+                await self._run_sync(worksheet.append_rows, rows_to_add)
+
+            logger.info(
+                f"Batch added {len(rows_to_add)} expenses for user {user_id}, "
+                f"failed: {len(errors)}"
+            )
+
+            return {
+                "added": len(rows_to_add),
+                "failed": len(errors),
+                "total": len(expenses),
+                "errors": errors
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to batch add expenses: {e}")
+            return {
+                "added": 0,
+                "failed": len(expenses),
+                "total": len(expenses),
+                "errors": [{"error": str(e)}]
+            }
+
     async def health_check(self) -> dict[str, Any]:
         """Check Google Sheets connection health."""
         try:
