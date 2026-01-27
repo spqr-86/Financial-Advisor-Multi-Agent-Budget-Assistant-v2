@@ -8,18 +8,26 @@ def get_categories_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [
-                KeyboardButton(text="🍕 Еда"),
+                KeyboardButton(text="🛒 Продукты"),
                 KeyboardButton(text="🚗 Транспорт"),
-                KeyboardButton(text="🏠 Дом"),
+                KeyboardButton(text="🍔 Еда"),
             ],
             [
-                KeyboardButton(text="🎮 Развлечения"),
-                KeyboardButton(text="💊 Здоровье"),
+                KeyboardButton(text="🏠 Аренда"),
+                KeyboardButton(text="💡 Коммуналка"),
+                KeyboardButton(text="📱 Связь"),
+            ],
+            [
                 KeyboardButton(text="👕 Одежда"),
+                KeyboardButton(text="💊 Здоровье, красота, гигиена"),
+                KeyboardButton(text="🍽️ Рестораны"),
             ],
             [
-                KeyboardButton(text="🎓 Образование"),
-                KeyboardButton(text="💼 Другое"),
+                KeyboardButton(text="🎁 Подарки"),
+                KeyboardButton(text="🎭 Кино, театры, музеи"),
+                KeyboardButton(text="💼 Прочее"),
+            ],
+            [
                 KeyboardButton(text="❌ Отмена"),
             ],
         ],
