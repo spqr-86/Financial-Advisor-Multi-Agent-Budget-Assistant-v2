@@ -335,6 +335,49 @@ git checkout dev  # вернуться обратно
 
 ---
 
+## Настройка удалённого MCP (SSE)
+
+### Включить SSE endpoint для Claude Desktop
+
+**Когда нужно:** Хотите использовать MCP через интернет (Claude Desktop без локального запуска)
+
+```bash
+# Обновить MCP сервис для поддержки SSE
+gcloud run services update budget-mcp \
+    --update-env-vars "MCP_TRANSPORT=both" \
+    --project=${GCP_PROJECT_ID} \
+    --region=${GCP_REGION}
+
+# Получить URL SSE endpoint
+MCP_URL=$(gcloud run services describe budget-mcp --region ${GCP_REGION} --format 'value(status.url)' --project ${GCP_PROJECT_ID})
+echo "${MCP_URL}/mcp/"
+```
+
+### Настроить Claude Desktop для удалённого MCP
+
+Создайте/отредактируйте `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "budget-assistant": {
+      "url": "https://budget-mcp-xxx.run.app/mcp/",
+      "transport": {
+        "type": "sse"
+      }
+    }
+  }
+}
+```
+
+Замените URL на ваш реальный Cloud Run URL.
+
+**Перезапустите Claude Desktop** для применения изменений.
+
+**См. также:** `docs/CLOUD_MCP_SETUP.md` для полной инструкции.
+
+---
+
 ## Быстрые команды (cheatsheet)
 
 ```bash

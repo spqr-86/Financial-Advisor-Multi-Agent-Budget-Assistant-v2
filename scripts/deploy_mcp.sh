@@ -25,7 +25,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --min-instances 0 \
     --concurrency 80 \
     --set-secrets "GOOGLE_API_KEY=google-api-key:latest,GOOGLE_APPLICATION_CREDENTIALS=service-account-json:latest" \
-    --set-env-vars "GOOGLE_SHEETS_SPREADSHEET_ID=${GOOGLE_SHEETS_SPREADSHEET_ID},GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-latest},LOG_LEVEL=INFO,ENVIRONMENT=production" \
+    --set-env-vars "GOOGLE_SHEETS_SPREADSHEET_ID=${GOOGLE_SHEETS_SPREADSHEET_ID},GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-latest},LOG_LEVEL=INFO,ENVIRONMENT=production,MCP_TRANSPORT=both" \
     --project ${PROJECT_ID}
 
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} \
