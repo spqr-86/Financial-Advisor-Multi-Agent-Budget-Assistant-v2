@@ -207,7 +207,8 @@ def format_help_message() -> str:
     msg += "/help - Эта справка\n"
     msg += "/stats - Статистика\n"
     msg += "/last - Последние расходы\n"
-    msg += "/delete - Удалить последний расход"
+    msg += "/delete - Удалить последний расход\n"
+    msg += "/limit - Управление лимитами"
 
     return msg
 
