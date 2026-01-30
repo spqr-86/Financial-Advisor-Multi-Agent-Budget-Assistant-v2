@@ -72,3 +72,46 @@ class DeleteLastExpenseRequest(BaseModel):
     """Request to delete last expense."""
 
     user_id: str = Field(..., min_length=1)
+
+
+# Limit schemas
+
+
+class GetLimitsRequest(BaseModel):
+    """Request to get budget limits."""
+
+    user_id: str = Field(..., min_length=1)
+
+
+class SetLimitRequest(BaseModel):
+    """Request to set a budget limit."""
+
+    user_id: str = Field(..., min_length=1)
+    category: str = Field(..., min_length=1, max_length=100)
+    amount: float = Field(..., ge=0)
+
+
+class DeleteLimitRequest(BaseModel):
+    """Request to delete a budget limit."""
+
+    user_id: str = Field(..., min_length=1)
+    category: str = Field(..., min_length=1, max_length=100)
+
+
+class LimitsResponse(BaseModel):
+    """Response with budget limits."""
+
+    status: str
+    user_id: str
+    limits: dict[str, float] = Field(default_factory=dict)
+
+
+class LimitResponse(BaseModel):
+    """Response for single limit operation."""
+
+    status: str
+    user_id: str
+    category: str
+    limit: float | None = None
+    deleted: bool = False
+    message: str | None = None
