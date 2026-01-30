@@ -310,7 +310,10 @@ class GoogleSheetsStorage(StorageInterface):
             elif period == "week":
                 start_date = now - timedelta(days=7)
             elif period == "month":
-                start_date = now - timedelta(days=30)
+                # Calendar month: from 1st day of current month
+                start_date = now.replace(
+                    day=1, hour=0, minute=0, second=0, microsecond=0
+                )
             elif period == "year":
                 start_date = now - timedelta(days=365)
             else:
