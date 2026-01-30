@@ -95,7 +95,10 @@ def format_expenses_list(expenses: list[dict[str, Any]], limit: int = 5) -> str:
         Formatted HTML message
     """
     if not expenses:
-        return "📝 <b>Расходов пока нет</b>\n\nНапишите что-нибудь вроде:\n<code>купил хлеб 50 рублей</code>"
+        return (
+            "📝 <b>Расходов пока нет</b>\n\n"
+            "Напишите что-нибудь вроде:\n<code>купил хлеб 50 рублей</code>"
+        )
 
     msg = f"📝 <b>Последние {min(limit, len(expenses))} расходов:</b>\n\n"
 
@@ -110,17 +113,25 @@ def format_expenses_list(expenses: list[dict[str, Any]], limit: int = 5) -> str:
         description = expense.get("description", "")
         amount = expense.get("amount", 0)
 
-        msg += f"{num} {date} | {emoji} <b>{category}</b> | {description} - <b>{amount:.0f}₽</b>\n"
+        msg += (
+            f"{num} {date} | {emoji} <b>{category}</b> | "
+            f"{description} - <b>{amount:.0f}₽</b>\n"
+        )
 
     return msg
 
 
-def format_statistics(stats: dict[str, Any], period: str = "неделю") -> str:
+def format_statistics(
+    stats: dict[str, Any],
+    period: str = "неделю",
+    limits: dict[str, float] | None = None,
+) -> str:
     """Format statistics with progress bars.
 
     Args:
         stats: Statistics dictionary with categories and amounts
         period: Period description (неделю, месяц, год)
+        limits: Optional dict of {category: limit} for monthly stats
 
     Returns:
         Formatted HTML message
@@ -141,17 +152,33 @@ def format_statistics(stats: dict[str, Any], period: str = "неделю") -> st
         categories.items(), key=lambda x: x[1], reverse=True
     )
 
+    # Use limits for progress bar if available (monthly stats)
+    use_limits = limits and period == "месяц"
+
     for category, amount in sorted_categories:
         emoji = get_category_emoji(category)
-        percentage = (amount / total) * 100 if total > 0 else 0
 
-        # Progress bar (10 blocks)
-        filled = int(percentage / 10)
-        bar = "█" * filled + "░" * (10 - filled)
+        if use_limits and category in limits:
+            limit = limits[category]
+            percentage = (amount / limit) * 100 if limit > 0 else 0
+            filled = min(int(percentage / 10), 10)
+            bar = "█" * filled + "░" * (10 - filled)
+            warning = " ⚠️" if percentage > 100 else ""
+            msg += (
+                f"{emoji} <b>{category}</b>: {amount:,.0f} / {limit:,.0f}₽ "
+                f"{bar} {percentage:.0f}%{warning}\n"
+            )
+        else:
+            # No limit - show percentage of total
+            percentage = (amount / total) * 100 if total > 0 else 0
+            filled = int(percentage / 10)
+            bar = "█" * filled + "░" * (10 - filled)
+            msg += (
+                f"{emoji} <b>{category}</b>: {amount:,.0f}₽ "
+                f"{bar} {percentage:.0f}%\n"
+            )
 
-        msg += f"{emoji} <b>{category}</b>: {amount:.0f}₽ {bar} {percentage:.0f}%\n"
-
-    msg += f"\n💰 <b>Итого: {total:.0f}₽</b>"
+    msg += f"\n💰 <b>Итого: {total:,.0f}₽</b>"
 
     return msg
 
@@ -212,3 +239,75 @@ def format_examples_message() -> str:
     msg += "💡 <b>Совет:</b> Пишите естественно, бот поймет!"
 
     return msg
+
+
+def format_limits(limits: dict[str, float]) -> str:
+    """Format budget limits list.
+
+    Args:
+        limits: Dict of {category: limit_amount}
+
+    Returns:
+        Formatted HTML message
+    """
+    if not limits:
+        msg = "📊 <b>Лимиты не установлены</b>\n\n"
+        msg += "Установить: <code>/limit Категория Сумма</code>\n"
+        msg += "Пример: <code>/limit Еда 10000</code>"
+        return msg
+
+    msg = "📊 <b>Ваши лимиты на месяц:</b>\n\n"
+
+    for category, amount in sorted(limits.items()):
+        emoji = get_category_emoji(category)
+        msg += f"{emoji} <b>{category}</b>: {amount:,.0f}₽\n"
+
+    msg += "\n<i>Изменить:</i> <code>/limit Категория Сумма</code>\n"
+    msg += "<i>Удалить:</i> <code>/limit Категория 0</code>"
+
+    return msg
+
+
+def format_limit_set(category: str, amount: float) -> str:
+    """Format limit set confirmation.
+
+    Args:
+        category: Category name
+        amount: Limit amount
+
+    Returns:
+        Formatted HTML message
+    """
+    emoji = get_category_emoji(category)
+    return f"✅ Лимит установлен: {emoji} <b>{category}</b> — {amount:,.0f}₽/месяц"
+
+
+def format_limit_deleted(category: str) -> str:
+    """Format limit deletion confirmation.
+
+    Args:
+        category: Category name
+
+    Returns:
+        Formatted HTML message
+    """
+    emoji = get_category_emoji(category)
+    return f"✅ Лимит удален: {emoji} <b>{category}</b>"
+
+
+def format_limit_exceeded(category: str, spent: float, limit: float) -> str:
+    """Format limit exceeded warning.
+
+    Args:
+        category: Category name
+        spent: Amount spent
+        limit: Limit amount
+
+    Returns:
+        Formatted HTML warning
+    """
+    emoji = get_category_emoji(category)
+    return (
+        f"\n\n⚠️ <b>Лимит превышен!</b>\n"
+        f"{emoji} {category}: {spent:,.0f} / {limit:,.0f}₽"
+    )

@@ -55,7 +55,8 @@ class ServiceClient:
 
             try:
                 logger.debug(
-                    f"Making {method} request to {url} (attempt {attempt + 1}/{self.max_retries})"
+                    f"Making {method} request to {url} "
+                    f"(attempt {attempt + 1}/{self.max_retries})"
                 )
 
                 async with session.request(method, url, **kwargs) as response:
@@ -128,6 +129,10 @@ class ServiceClient:
     ) -> dict[str, Any]:
         """Make POST request."""
         return await self._request("POST", path, json=json, **kwargs)
+
+    async def delete(self, path: str, **kwargs: Any) -> dict[str, Any]:
+        """Make DELETE request."""
+        return await self._request("DELETE", path, **kwargs)
 
     async def health_check(self) -> bool:
         """Check if service is healthy."""
