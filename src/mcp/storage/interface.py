@@ -107,6 +107,51 @@ class StorageInterface(ABC):
         """
 
     @abstractmethod
+    async def get_limits(self, user_id: str) -> dict[str, Any]:
+        """Get all budget limits.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            dict with limits: {category: amount}
+        """
+
+    @abstractmethod
+    async def set_limit(
+        self,
+        user_id: str,
+        category: str,
+        amount: float,
+    ) -> dict[str, Any]:
+        """Set budget limit for a category.
+
+        Args:
+            user_id: User identifier
+            category: Expense category
+            amount: Limit amount (0 to delete)
+
+        Returns:
+            dict with status and limit details
+        """
+
+    @abstractmethod
+    async def delete_limit(
+        self,
+        user_id: str,
+        category: str,
+    ) -> dict[str, Any]:
+        """Delete budget limit for a category.
+
+        Args:
+            user_id: User identifier
+            category: Expense category
+
+        Returns:
+            dict with status
+        """
+
+    @abstractmethod
     async def health_check(self) -> dict[str, Any]:
         """Check storage health.
 
