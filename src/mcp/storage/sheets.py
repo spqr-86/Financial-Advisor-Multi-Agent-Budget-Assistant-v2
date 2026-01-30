@@ -76,7 +76,8 @@ class GoogleSheetsStorage(StorageInterface):
                     )
                 except gspread.SpreadsheetNotFound:
                     logger.info(
-                        f"Creating new spreadsheet: {settings.google_sheets_spreadsheet_name}"
+                        f"Creating new spreadsheet: "
+                        f"{settings.google_sheets_spreadsheet_name}"
                     )
                     self._spreadsheet = await self._run_sync(
                         self._client.create, settings.google_sheets_spreadsheet_name
@@ -107,6 +108,34 @@ class GoogleSheetsStorage(StorageInterface):
 
         return worksheet
 
+    async def _get_limits_worksheet(self) -> gspread.Worksheet:
+        """Get or create the limits worksheet."""
+        await self._connect()
+
+        worksheet_name = "Лимиты"
+
+        try:
+            worksheet = await self._run_sync(
+                self._spreadsheet.worksheet, worksheet_name
+            )
+            logger.info(f"Using limits worksheet: {worksheet_name}")
+        except gspread.WorksheetNotFound:
+            logger.info(f"Creating limits worksheet: {worksheet_name}")
+            worksheet = await self._run_sync(
+                self._spreadsheet.add_worksheet,
+                title=worksheet_name,
+                rows=100,
+                cols=2,
+            )
+            # Add headers
+            await self._run_sync(
+                worksheet.update,
+                "A1:B1",
+                [["Категория", "Лимит"]],
+            )
+
+        return worksheet
+
     async def add_expense(
         self,
         user_id: str,
@@ -127,7 +156,8 @@ class GoogleSheetsStorage(StorageInterface):
             date_str = expense_date.strftime("%d.%m.%Y")
 
             # Find the first empty row in column A using a more efficient way
-            # We use get_all_values() which is often cached or more efficient for smaller sheets
+            # We use get_all_values() which is often cached or more
+            # efficient for smaller sheets
             all_values = await self._run_sync(worksheet.get_all_values)
 
             # Find first row where column A is empty
@@ -145,7 +175,9 @@ class GoogleSheetsStorage(StorageInterface):
                 [[date_str, category, description, amount]],
             )
 
-            logger.info(f"Added expense for user {user_id}: {category} - {amount}")
+            logger.info(
+                f"Added expense for user {user_id}: {category} - {amount}"
+            )
 
             return {
                 "status": "success",
@@ -188,7 +220,6 @@ class GoogleSheetsStorage(StorageInterface):
                 }
 
             # First row is headers, rest are data
-            headers = all_values[0]
             rows = all_values[1:]
 
             # Convert to list of dicts
@@ -489,3 +520,125 @@ class GoogleSheetsStorage(StorageInterface):
                 "backend": "google_sheets",
                 "error": str(e),
             }
+
+    async def get_limits(self, user_id: str) -> dict[str, Any]:
+        """Get all budget limits from Google Sheets."""
+        try:
+            worksheet = await self._get_limits_worksheet()
+
+            all_values = await self._run_sync(worksheet.get_all_values)
+
+            if not all_values or len(all_values) < 2:
+                return {
+                    "status": "success",
+                    "user_id": user_id,
+                    "limits": {},
+                }
+
+            # Skip header row
+            rows = all_values[1:]
+            limits = {}
+
+            for row in rows:
+                if len(row) >= 2 and row[0] and row[1]:
+                    category = row[0]
+                    try:
+                        amount = float(row[1].replace(",", ".").replace(" ", ""))
+                        if amount > 0:
+                            limits[category] = amount
+                    except (ValueError, TypeError):
+                        continue
+
+            logger.info(f"Got {len(limits)} limits for user {user_id}")
+
+            return {
+                "status": "success",
+                "user_id": user_id,
+                "limits": limits,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get limits: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "limits": {},
+            }
+
+    async def set_limit(
+        self,
+        user_id: str,
+        category: str,
+        amount: float,
+    ) -> dict[str, Any]:
+        """Set budget limit for a category."""
+        try:
+            worksheet = await self._get_limits_worksheet()
+
+            all_values = await self._run_sync(worksheet.get_all_values)
+
+            # Find existing row for this category
+            row_index = None
+            for i, row in enumerate(all_values):
+                if len(row) >= 1 and row[0] == category:
+                    row_index = i + 1  # 1-indexed
+                    break
+
+            if amount <= 0:
+                # Delete limit
+                if row_index and row_index > 1:  # Don't delete header
+                    await self._run_sync(worksheet.delete_rows, row_index)
+                    logger.info(f"Deleted limit for {category}")
+                    return {
+                        "status": "success",
+                        "user_id": user_id,
+                        "category": category,
+                        "deleted": True,
+                    }
+                return {
+                    "status": "success",
+                    "user_id": user_id,
+                    "category": category,
+                    "deleted": False,
+                    "message": "Limit not found",
+                }
+
+            if row_index:
+                # Update existing
+                await self._run_sync(
+                    worksheet.update,
+                    f"B{row_index}",
+                    [[amount]],
+                )
+                logger.info(f"Updated limit for {category}: {amount}")
+            else:
+                # Add new row
+                next_row = len(all_values) + 1
+                await self._run_sync(
+                    worksheet.update,
+                    f"A{next_row}:B{next_row}",
+                    [[category, amount]],
+                )
+                logger.info(f"Added limit for {category}: {amount}")
+
+            return {
+                "status": "success",
+                "user_id": user_id,
+                "category": category,
+                "limit": amount,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to set limit: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+            }
+
+    async def delete_limit(
+        self,
+        user_id: str,
+        category: str,
+    ) -> dict[str, Any]:
+        """Delete budget limit for a category."""
+        return await self.set_limit(user_id, category, 0)
