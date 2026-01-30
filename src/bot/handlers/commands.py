@@ -7,9 +7,13 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from src.bot.formatters import (
+    CATEGORY_EMOJI,
     format_examples_message,
     format_expenses_list,
     format_help_message,
+    format_limit_deleted,
+    format_limit_set,
+    format_limits,
     format_statistics,
 )
 from src.bot.keyboards.inline import (
@@ -157,3 +161,102 @@ async def cmd_examples(message: Message) -> None:
         parse_mode="HTML",
         reply_markup=get_back_to_menu_keyboard(),
     )
+
+
+@router.message(Command("limit"))
+async def cmd_limit(
+    message: Message,
+    api_client: ServiceClient | None = None,
+) -> None:
+    """Handle /limit command - manage budget limits."""
+    if not message.from_user:
+        return
+
+    if not api_client:
+        logger.error(
+            f"API client not configured for user {message.from_user.id}"
+        )
+        await message.answer("API не настроен. Проверьте конфигурацию.")
+        return
+
+    user_id = str(message.from_user.id)
+    args = message.text.split()[1:]  # Remove "/limit"
+
+    await message.bot.send_chat_action(message.chat.id, "typing")
+
+    try:
+        if not args:
+            # Show all limits
+            result = await api_client.get(f"/api/limits/{user_id}")
+            limits = result.get("limits", {})
+            await message.answer(
+                format_limits(limits),
+                parse_mode="HTML",
+            )
+
+        elif len(args) == 2:
+            category, amount_str = args[0], args[1]
+
+            # Validate category
+            if category not in CATEGORY_EMOJI:
+                categories_list = ", ".join(sorted(CATEGORY_EMOJI.keys()))
+                await message.answer(
+                    f"❌ Неизвестная категория: <b>{category}</b>\n\n"
+                    f"Доступные категории:\n<code>{categories_list}</code>",
+                    parse_mode="HTML",
+                )
+                return
+
+            # Parse amount
+            try:
+                amount = float(amount_str.replace(",", "."))
+            except ValueError:
+                await message.answer(
+                    "❌ Неверная сумма. Используйте число.\n\n"
+                    "Пример: <code>/limit Еда 10000</code>",
+                    parse_mode="HTML",
+                )
+                return
+
+            if amount <= 0:
+                # Delete limit
+                await api_client.delete(f"/api/limits/{user_id}/{category}")
+                await message.answer(
+                    format_limit_deleted(category),
+                    parse_mode="HTML",
+                )
+            else:
+                # Set limit
+                await api_client.post(
+                    "/api/limits",
+                    json={
+                        "user_id": user_id,
+                        "category": category,
+                        "amount": amount,
+                    },
+                )
+                await message.answer(
+                    format_limit_set(category, amount),
+                    parse_mode="HTML",
+                )
+
+        else:
+            await message.answer(
+                "❌ Неверный формат команды.\n\n"
+                "Использование:\n"
+                "<code>/limit</code> — показать все лимиты\n"
+                "<code>/limit Категория Сумма</code> — установить лимит\n"
+                "<code>/limit Категория 0</code> — удалить лимит\n\n"
+                "Пример: <code>/limit Еда 10000</code>",
+                parse_mode="HTML",
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Limit command failed for user {user_id}: "
+            f"{type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        await message.answer(
+            "Не удалось выполнить команду. Попробуйте позже."
+        )
