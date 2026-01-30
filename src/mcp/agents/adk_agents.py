@@ -75,8 +75,12 @@ registrar_agent = LlmAgent(
 3. Сформулируй краткое описание
 4. ОБЯЗАТЕЛЬНО вызови add_expense_tool с параметрами: category, amount, description, user_id="default"
 5. ТОЛЬКО ПОСЛЕ успешного вызова tool подтверди пользователю что расход добавлен
+6. ПРОВЕРЬ результат add_expense_tool на наличие поля limit_exceeded
+7. Если limit_exceeded присутствует, ОБЯЗАТЕЛЬНО предупреди:
+   "⚠️ Превышен лимит по категории {category}: {spent}₽ из {limit}₽"
 
-НЕ симулируй добавление! ВСЕГДА вызывай add_expense_tool для реального добавления в таблицу.
+НЕ симулируй добавление! ВСЕГДА вызывай add_expense_tool для реального добавления
+в таблицу.
 Отвечай кратко и дружелюбно на русском языке.""",
     tools=[add_expense_tool, delete_last_expense_tool],  # Передаем функции напрямую
     output_key="registrar_result",

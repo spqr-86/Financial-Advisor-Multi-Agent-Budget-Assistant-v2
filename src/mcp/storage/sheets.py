@@ -179,6 +179,23 @@ class GoogleSheetsStorage(StorageInterface):
                 f"Added expense for user {user_id}: {category} - {amount}"
             )
 
+            # Check if limit exceeded
+            limits_result = await self.get_limits(user_id)
+            limits = limits_result.get("limits", {})
+
+            limit_exceeded = None
+            if category in limits:
+                # Get current month's spending for this category
+                stats = await self.get_statistics(user_id, "month")
+                spent = stats.get("by_category", {}).get(category, 0)
+                limit = limits[category]
+                if spent > limit:
+                    limit_exceeded = {
+                        "category": category,
+                        "spent": spent,
+                        "limit": limit,
+                    }
+
             return {
                 "status": "success",
                 "user_id": user_id,
@@ -186,6 +203,7 @@ class GoogleSheetsStorage(StorageInterface):
                 "amount": amount,
                 "description": description,
                 "date": date_str,
+                "limit_exceeded": limit_exceeded,
             }
 
         except Exception as e:

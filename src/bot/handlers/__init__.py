@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 
 from aiogram import F, Router
 from aiogram.filters import CommandStart
@@ -93,22 +94,80 @@ async def handle_text(
             for keyword in ["добавлен", "записал", "сохранил", "добавил"]
         )
 
-        # Send all chunks
-        for i, chunk in enumerate(message_chunks):
-            # Add keyboard only to the last message if expense was added
-            keyboard = None
-            if show_after_add_keyboard and i == len(message_chunks) - 1:
-                keyboard = get_after_add_keyboard()
+        # Detect limit warnings in AI response and format them
+        limit_warning_pattern = (
+            r"⚠️ Превышен лимит по категории ([^:]+): ([\d,]+)₽ из ([\d,]+)₽"
+        )
+        limit_match = re.search(limit_warning_pattern, response)
 
-            await message.answer(
-                chunk,
-                parse_mode="HTML",
-                reply_markup=keyboard,
-            )
+        if limit_match:
+            # Extract warning from response and format it separately
+            category = limit_match.group(1).strip()
+            spent_str = limit_match.group(2).replace(",", "")
+            limit_str = limit_match.group(3).replace(",", "")
 
-            # Small delay between messages to avoid rate limits
-            if i < len(message_chunks) - 1:
-                await asyncio.sleep(0.5)
+            try:
+                spent = float(spent_str)
+                limit = float(limit_str)
+
+                # Remove warning from main response
+                response = re.sub(limit_warning_pattern, "", response).strip()
+                message_chunks = split_long_message(response)
+
+                # Import formatter
+                from src.bot.formatters import format_limit_exceeded
+
+                # Send main response first
+                for i, chunk in enumerate(message_chunks):
+                    keyboard = None
+                    if show_after_add_keyboard and i == len(message_chunks) - 1:
+                        keyboard = get_after_add_keyboard()
+
+                    await message.answer(
+                        chunk,
+                        parse_mode="HTML",
+                        reply_markup=keyboard,
+                    )
+
+                    if i < len(message_chunks) - 1:
+                        await asyncio.sleep(0.5)
+
+                # Send formatted warning separately
+                await message.answer(
+                    format_limit_exceeded(category, spent, limit),
+                    parse_mode="HTML",
+                )
+
+            except (ValueError, IndexError):
+                # If parsing fails, send response as-is
+                for i, chunk in enumerate(message_chunks):
+                    keyboard = None
+                    if show_after_add_keyboard and i == len(message_chunks) - 1:
+                        keyboard = get_after_add_keyboard()
+
+                    await message.answer(
+                        chunk,
+                        parse_mode="HTML",
+                        reply_markup=keyboard,
+                    )
+
+                    if i < len(message_chunks) - 1:
+                        await asyncio.sleep(0.5)
+        else:
+            # No limit warning - send as normal
+            for i, chunk in enumerate(message_chunks):
+                keyboard = None
+                if show_after_add_keyboard and i == len(message_chunks) - 1:
+                    keyboard = get_after_add_keyboard()
+
+                await message.answer(
+                    chunk,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+
+                if i < len(message_chunks) - 1:
+                    await asyncio.sleep(0.5)
 
     except asyncio.TimeoutError:
         logger.warning(f"Request timeout for user {user_id}: {query_preview}")
