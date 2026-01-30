@@ -338,8 +338,18 @@ async def callback_stats_period(
             },
         )
 
+        # Fetch limits for monthly stats
+        limits = None
+        if callback.data == "stats_month":
+            limits_result = await api_client.get(f"/api/limits/{user_id}")
+            limits = limits_result.get("limits", {})
+
         if "statistics" in result:
-            stats_text = format_statistics(result["statistics"], period=period_name)
+            stats_text = format_statistics(
+                result["statistics"],
+                period=period_name,
+                limits=limits if limits else None,
+            )
         else:
             stats_text = result.get("response", "Нет данных")
 
@@ -351,7 +361,8 @@ async def callback_stats_period(
 
     except Exception as e:
         logger.error(
-            f"Stats period callback failed for user {user_id}: {type(e).__name__}: {e}",
+            f"Stats period callback failed for user {user_id}: "
+            f"{type(e).__name__}: {e}",
             exc_info=True,
         )
         await callback.message.edit_text(

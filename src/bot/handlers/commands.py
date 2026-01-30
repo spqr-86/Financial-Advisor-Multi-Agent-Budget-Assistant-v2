@@ -60,20 +60,27 @@ async def cmd_stats(
     await message.bot.send_chat_action(message.chat.id, "typing")
 
     try:
-        # Request statistics from API
-        result = await api_client.post(
+        # Request statistics and limits in parallel
+        stats_result = await api_client.post(
             "/api/query",
             json={
-                "query": "покажи статистику за неделю",
+                "query": "покажи статистику за месяц",
                 "user_id": user_id,
             },
         )
 
-        # Try to parse structured response or use plain text
-        if "statistics" in result:
-            stats_text = format_statistics(result["statistics"], period="неделю")
+        limits_result = await api_client.get(f"/api/limits/{user_id}")
+        limits = limits_result.get("limits", {})
+
+        # Format with limits for monthly stats
+        if "statistics" in stats_result:
+            stats_text = format_statistics(
+                stats_result["statistics"],
+                period="месяц",
+                limits=limits if limits else None,
+            )
         else:
-            stats_text = result.get("response", "Нет данных")
+            stats_text = stats_result.get("response", "Нет данных")
 
         await message.answer(
             stats_text,
