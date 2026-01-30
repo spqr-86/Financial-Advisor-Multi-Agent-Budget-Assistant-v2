@@ -179,3 +179,36 @@ async def storage_health(
     """Check storage health."""
     result = await storage.health_check()
     return result
+
+
+@router.post("/limits")
+async def get_limits(
+    request: dict,
+    storage: StorageInterface = Depends(get_storage),
+) -> dict:
+    """Get all budget limits."""
+    user_id = request.get("user_id", "default")
+    return await storage.get_limits(user_id)
+
+
+@router.post("/limits/set")
+async def set_limit(
+    request: dict,
+    storage: StorageInterface = Depends(get_storage),
+) -> dict:
+    """Set a budget limit."""
+    user_id = request.get("user_id", "default")
+    category = request.get("category")
+    amount = request.get("amount", 0)
+    return await storage.set_limit(user_id, category, amount)
+
+
+@router.post("/limits/delete")
+async def delete_limit(
+    request: dict,
+    storage: StorageInterface = Depends(get_storage),
+) -> dict:
+    """Delete a budget limit."""
+    user_id = request.get("user_id", "default")
+    category = request.get("category")
+    return await storage.delete_limit(user_id, category)
