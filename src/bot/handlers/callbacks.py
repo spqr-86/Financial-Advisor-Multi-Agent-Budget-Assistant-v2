@@ -1,5 +1,6 @@
 """Callback query handlers for inline buttons."""
 
+import asyncio
 import logging
 
 from aiogram import F, Router
@@ -18,6 +19,7 @@ from src.bot.keyboards.inline import (
     get_main_menu_keyboard,
     get_stats_period_keyboard,
 )
+from src.bot.decorators import require_api_client
 from src.bot.keyboards.reply import get_categories_keyboard
 from src.bot.states import AddExpenseStates
 from src.core.http_client import ServiceClient
@@ -73,16 +75,13 @@ async def callback_show_examples(callback: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data == "show_stats")
+@require_api_client
 async def callback_show_stats(
     callback: CallbackQuery,
     api_client: ServiceClient | None = None,
 ) -> None:
     """Handle show stats button."""
     if not callback.message or not callback.from_user:
-        return
-
-    if not api_client:
-        await callback.answer("API не настроен", show_alert=True)
         return
 
     user_id = str(callback.from_user.id)
@@ -124,16 +123,13 @@ async def callback_show_stats(
 
 
 @router.callback_query(F.data == "show_last")
+@require_api_client
 async def callback_show_last(
     callback: CallbackQuery,
     api_client: ServiceClient | None = None,
 ) -> None:
     """Handle show last expenses button."""
     if not callback.message or not callback.from_user:
-        return
-
-    if not api_client:
-        await callback.answer("API не настроен", show_alert=True)
         return
 
     user_id = str(callback.from_user.id)
@@ -175,16 +171,13 @@ async def callback_show_last(
 
 
 @router.callback_query(F.data == "confirm_delete")
+@require_api_client
 async def callback_confirm_delete(
     callback: CallbackQuery,
     api_client: ServiceClient | None = None,
 ) -> None:
     """Handle confirm delete button."""
     if not callback.message or not callback.from_user:
-        return
-
-    if not api_client:
-        await callback.answer("API не настроен", show_alert=True)
         return
 
     user_id = str(callback.from_user.id)
@@ -237,16 +230,13 @@ async def callback_cancel_delete(callback: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data == "delete_last")
+@require_api_client
 async def callback_delete_last(
     callback: CallbackQuery,
     api_client: ServiceClient | None = None,
 ) -> None:
     """Handle delete last expense button (from after_add keyboard)."""
     if not callback.message or not callback.from_user:
-        return
-
-    if not api_client:
-        await callback.answer("API не настроен", show_alert=True)
         return
 
     user_id = str(callback.from_user.id)
@@ -306,16 +296,13 @@ async def callback_add_more(callback: CallbackQuery, state: FSMContext) -> None:
 
 
 @router.callback_query(F.data.in_({"stats_week", "stats_month", "stats_year"}))
+@require_api_client
 async def callback_stats_period(
     callback: CallbackQuery,
     api_client: ServiceClient | None = None,
 ) -> None:
     """Handle stats period selection buttons."""
     if not callback.message or not callback.from_user or not callback.data:
-        return
-
-    if not api_client:
-        await callback.answer("API не настроен", show_alert=True)
         return
 
     period_map = {
@@ -330,19 +317,22 @@ async def callback_stats_period(
     await callback.message.edit_text("⏳ Загружаю статистику...")
 
     try:
-        result = await api_client.post(
-            "/api/query",
-            json={
-                "query": query,
-                "user_id": user_id,
-            },
-        )
-
-        # Fetch limits for monthly stats
-        limits = None
+        # Fetch stats and limits in parallel for monthly stats
         if callback.data == "stats_month":
-            limits_result = await api_client.get(f"/api/limits/{user_id}")
+            result, limits_result = await asyncio.gather(
+                api_client.post(
+                    "/api/query",
+                    json={"query": query, "user_id": user_id},
+                ),
+                api_client.get(f"/api/limits/{user_id}"),
+            )
             limits = limits_result.get("limits", {})
+        else:
+            result = await api_client.post(
+                "/api/query",
+                json={"query": query, "user_id": user_id},
+            )
+            limits = None
 
         if "statistics" in result:
             stats_text = format_statistics(

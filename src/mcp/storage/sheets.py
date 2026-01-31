@@ -9,6 +9,7 @@ from typing import Any
 import gspread
 from google.oauth2.service_account import Credentials
 
+from src.core.cache import limits_cache
 from src.core.categories import VALID_CATEGORIES
 from src.mcp.config import settings
 from src.mcp.storage.interface import StorageInterface
@@ -137,6 +138,57 @@ class GoogleSheetsStorage(StorageInterface):
 
         return worksheet
 
+    def _calculate_month_spent_for_category(
+        self,
+        all_values: list[list[str]],
+        target_category: str,
+    ) -> float:
+        """Calculate month spending for a category from already loaded data.
+
+        This avoids a second API call when checking limits after adding expense.
+        """
+        if not all_values or len(all_values) < 2:
+            return 0.0
+
+        now = datetime.now()
+        start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        total = 0.0
+        for row in all_values[1:]:  # Skip header
+            if len(row) < 4:
+                continue
+
+            # Check category match
+            category = row[1] if len(row) > 1 else ""
+            if category != target_category:
+                continue
+
+            # Check date is in current month
+            date_str = row[0] if len(row) > 0 else ""
+            if date_str:
+                try:
+                    row_date = datetime.strptime(date_str, "%d.%m.%Y")
+                    if row_date < start_date:
+                        continue
+                except ValueError:
+                    pass
+
+            # Parse amount
+            try:
+                amount_str = row[3] if len(row) > 3 else "0"
+                amount_str = (
+                    amount_str.replace(",", ".")
+                    .replace("₽", "")
+                    .replace(" ", "")
+                    .replace("\u00a0", "")
+                    .strip()
+                )
+                total += float(amount_str) if amount_str else 0.0
+            except (ValueError, TypeError):
+                pass
+
+        return total
+
     async def add_expense(
         self,
         user_id: str,
@@ -156,9 +208,7 @@ class GoogleSheetsStorage(StorageInterface):
             expense_date = date or datetime.now()
             date_str = expense_date.strftime("%d.%m.%Y")
 
-            # Find the first empty row in column A using a more efficient way
-            # We use get_all_values() which is often cached or more
-            # efficient for smaller sheets
+            # Find the first empty row in column A
             all_values = await self._run_sync(worksheet.get_all_values)
 
             # Find first row where column A is empty
@@ -169,7 +219,6 @@ class GoogleSheetsStorage(StorageInterface):
                     break
 
             # Append row: Дата, Категория, Расшифровка, Сумма
-            # Using update instead of append_row to target specific row in columns A:D
             await self._run_sync(
                 worksheet.update,
                 f"A{next_row}:D{next_row}",
@@ -180,15 +229,17 @@ class GoogleSheetsStorage(StorageInterface):
                 f"Added expense for user {user_id}: {category} - {amount}"
             )
 
-            # Check if limit exceeded
+            # Check if limit exceeded (using cached limits + in-memory calculation)
             limits_result = await self.get_limits(user_id)
             limits = limits_result.get("limits", {})
 
             limit_exceeded = None
             if category in limits:
-                # Get current month's spending for this category
-                stats = await self.get_statistics(user_id, "month")
-                spent = stats.get("by_category", {}).get(category, 0)
+                # Calculate from already loaded data (no second API call!)
+                spent_before = self._calculate_month_spent_for_category(
+                    all_values, category
+                )
+                spent = spent_before + amount  # Include just added expense
                 limit = limits[category]
                 if spent > limit:
                     limit_exceeded = {
@@ -527,18 +578,27 @@ class GoogleSheetsStorage(StorageInterface):
             }
 
     async def get_limits(self, user_id: str) -> dict[str, Any]:
-        """Get all budget limits from Google Sheets."""
+        """Get all budget limits from Google Sheets (cached for 60s)."""
+        # Check cache first
+        cache_key = f"limits:{user_id}"
+        cached = limits_cache.get(cache_key)
+        if cached is not None:
+            logger.debug(f"Limits cache hit for user {user_id}")
+            return cached
+
         try:
             worksheet = await self._get_limits_worksheet()
 
             all_values = await self._run_sync(worksheet.get_all_values)
 
             if not all_values or len(all_values) < 2:
-                return {
+                result = {
                     "status": "success",
                     "user_id": user_id,
                     "limits": {},
                 }
+                limits_cache.set(cache_key, result)
+                return result
 
             # Skip header row
             rows = all_values[1:]
@@ -561,11 +621,13 @@ class GoogleSheetsStorage(StorageInterface):
 
             logger.info(f"Got {len(limits)} limits for user {user_id}")
 
-            return {
+            result = {
                 "status": "success",
                 "user_id": user_id,
                 "limits": limits,
             }
+            limits_cache.set(cache_key, result)
+            return result
 
         except Exception as e:
             logger.error(f"Failed to get limits: {e}")
@@ -599,6 +661,8 @@ class GoogleSheetsStorage(StorageInterface):
                 if row_index and row_index > 1:  # Don't delete header
                     await self._run_sync(worksheet.delete_rows, row_index)
                     logger.info(f"Deleted limit for {category}")
+                    # Invalidate cache
+                    limits_cache.invalidate(f"limits:{user_id}")
                     return {
                         "status": "success",
                         "user_id": user_id,
@@ -630,6 +694,9 @@ class GoogleSheetsStorage(StorageInterface):
                     [[category, amount]],
                 )
                 logger.info(f"Added limit for {category}: {amount}")
+
+            # Invalidate cache after update
+            limits_cache.invalidate(f"limits:{user_id}")
 
             return {
                 "status": "success",

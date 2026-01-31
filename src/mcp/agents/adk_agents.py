@@ -29,9 +29,10 @@ logger = logging.getLogger(__name__)
 os.environ["GOOGLE_API_KEY"] = settings.google_api_key
 
 # Retry configuration for robustness
+# Exponential backoff: 1s, 2s, 4s, 8s (total ~15s max wait)
 retry_config = types.HttpRetryOptions(
-    attempts=5,
-    exp_base=7,
+    attempts=4,
+    exp_base=2,
     initial_delay=1,
     http_status_codes=[429, 500, 503, 504],
 )

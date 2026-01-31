@@ -1,5 +1,6 @@
 """Command handlers for the bot."""
 
+import asyncio
 import logging
 
 from aiogram import Router
@@ -16,6 +17,7 @@ from src.bot.formatters import (
     format_limits,
     format_statistics,
 )
+from src.bot.decorators import require_api_client
 from src.bot.keyboards.inline import (
     get_back_to_menu_keyboard,
     get_confirm_delete_keyboard,
@@ -43,6 +45,7 @@ async def cmd_help(message: Message) -> None:
 
 
 @router.message(Command("stats"))
+@require_api_client
 async def cmd_stats(
     message: Message,
     api_client: ServiceClient | None = None,
@@ -51,25 +54,21 @@ async def cmd_stats(
     if not message.from_user:
         return
 
-    if not api_client:
-        logger.error(f"API client not configured for user {message.from_user.id}")
-        await message.answer("API не настроен. Проверьте конфигурацию.")
-        return
-
     user_id = str(message.from_user.id)
     await message.bot.send_chat_action(message.chat.id, "typing")
 
     try:
         # Request statistics and limits in parallel
-        stats_result = await api_client.post(
-            "/api/query",
-            json={
-                "query": "покажи статистику за месяц",
-                "user_id": user_id,
-            },
+        stats_result, limits_result = await asyncio.gather(
+            api_client.post(
+                "/api/query",
+                json={
+                    "query": "покажи статистику за месяц",
+                    "user_id": user_id,
+                },
+            ),
+            api_client.get(f"/api/limits/{user_id}"),
         )
-
-        limits_result = await api_client.get(f"/api/limits/{user_id}")
         limits = limits_result.get("limits", {})
 
         # Format with limits for monthly stats
@@ -97,17 +96,13 @@ async def cmd_stats(
 
 
 @router.message(Command("last"))
+@require_api_client
 async def cmd_last(
     message: Message,
     api_client: ServiceClient | None = None,
 ) -> None:
     """Handle /last command - show recent expenses."""
     if not message.from_user:
-        return
-
-    if not api_client:
-        logger.error(f"API client not configured for user {message.from_user.id}")
-        await message.answer("API не настроен. Проверьте конфигурацию.")
         return
 
     user_id = str(message.from_user.id)
@@ -171,19 +166,13 @@ async def cmd_examples(message: Message) -> None:
 
 
 @router.message(Command("limit"))
+@require_api_client
 async def cmd_limit(
     message: Message,
     api_client: ServiceClient | None = None,
 ) -> None:
     """Handle /limit command - manage budget limits."""
     if not message.from_user:
-        return
-
-    if not api_client:
-        logger.error(
-            f"API client not configured for user {message.from_user.id}"
-        )
-        await message.answer("API не настроен. Проверьте конфигурацию.")
         return
 
     user_id = str(message.from_user.id)
