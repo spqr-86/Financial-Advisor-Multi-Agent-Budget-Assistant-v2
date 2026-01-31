@@ -81,7 +81,7 @@ async def callback_show_stats(
     callback: CallbackQuery,
     api_client: ServiceClient | None = None,
 ) -> None:
-    """Handle show stats button."""
+    """Handle show stats button - shows monthly stats with limits by default."""
     if not callback.message or not callback.from_user:
         return
 
@@ -91,16 +91,28 @@ async def callback_show_stats(
     await callback.message.edit_text("⏳ Загружаю статистику...")
 
     try:
-        result = await api_client.post(
-            "/api/query",
-            json={
-                "query": "покажи статистику за неделю",
-                "user_id": user_id,
-            },
+        # Fetch stats and limits in parallel (monthly stats with limits)
+        result, limits_result = await asyncio.gather(
+            api_client.post(
+                "/api/query",
+                json={
+                    "query": "покажи статистику за месяц",
+                    "user_id": user_id,
+                },
+            ),
+            api_client.get(f"/api/limits/{user_id}"),
+        )
+        limits = limits_result.get("limits", {})
+        logger.info(
+            f"Show stats for user {user_id}: loaded {len(limits)} limits"
         )
 
         if "statistics" in result:
-            stats_text = format_statistics(result["statistics"], period="неделю")
+            stats_text = format_statistics(
+                result["statistics"],
+                period="месяц",
+                limits=limits if limits else None,
+            )
         else:
             stats_text = result.get("response", "Нет данных")
 
@@ -412,6 +424,10 @@ async def callback_stats_period(
                 api_client.get(f"/api/limits/{user_id}"),
             )
             limits = limits_result.get("limits", {})
+            logger.info(
+                f"Stats month for user {user_id}: "
+                f"limits_result={limits_result}, limits={limits}"
+            )
         else:
             result = await api_client.post(
                 "/api/query",
@@ -420,6 +436,10 @@ async def callback_stats_period(
             limits = None
 
         if "statistics" in result:
+            logger.info(
+                f"Formatting stats: period={period_name}, "
+                f"limits_count={len(limits) if limits else 0}"
+            )
             stats_text = format_statistics(
                 result["statistics"],
                 period=period_name,

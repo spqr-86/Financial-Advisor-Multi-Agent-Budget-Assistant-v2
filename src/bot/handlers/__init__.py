@@ -9,6 +9,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message
 
 from src.bot.decorators import require_api_client
+from src.bot.formatters import format_statistics
 from src.bot.keyboards import get_after_add_keyboard, get_main_menu_keyboard
 from src.bot.utils import send_chunked_message
 from src.core.exceptions import QuotaExceededError, ServiceUnavailableError
@@ -71,11 +72,44 @@ async def handle_text(
     logger.info(f"[{req_id}] Processing query from user {user_id}: {query_preview}")
 
     try:
-        result = await api_client.post(
-            "/api/query",
-            json={"query": message.text, "user_id": user_id},
+        # Check if this is a monthly stats request (to load limits)
+        query_lower = message.text.lower()
+        is_monthly_stats = (
+            "месяц" in query_lower
+            and any(kw in query_lower for kw in ["статистик", "расход", "потратил"])
         )
-        response = result.get("response", "Нет ответа")
+
+        if is_monthly_stats:
+            # Fetch stats and limits in parallel for monthly stats
+            result, limits_result = await asyncio.gather(
+                api_client.post(
+                    "/api/query",
+                    json={"query": message.text, "user_id": user_id},
+                ),
+                api_client.get(f"/api/limits/{user_id}"),
+            )
+            limits = limits_result.get("limits", {})
+            logger.info(
+                f"[{req_id}] Monthly stats for user {user_id}: "
+                f"loaded {len(limits)} limits"
+            )
+        else:
+            result = await api_client.post(
+                "/api/query",
+                json={"query": message.text, "user_id": user_id},
+            )
+            limits = None
+
+        # If response contains statistics data, format it properly with limits
+        if "statistics" in result:
+            period = "месяц" if is_monthly_stats else "неделю"
+            response = format_statistics(
+                result["statistics"],
+                period=period,
+                limits=limits if limits else None,
+            )
+        else:
+            response = result.get("response", "Нет ответа")
 
         logger.info(f"[{req_id}] Response for user {user_id}: {len(response)} chars")
 

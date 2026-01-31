@@ -591,6 +591,9 @@ class GoogleSheetsStorage(StorageInterface):
             worksheet = await self._get_limits_worksheet()
 
             all_values = await self._run_sync(worksheet.get_all_values)
+            logger.info(
+                f"Limits worksheet '{worksheet.title}' has {len(all_values)} rows"
+            )
 
             if not all_values or len(all_values) < 2:
                 result = {
