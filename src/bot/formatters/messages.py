@@ -137,6 +137,49 @@ def format_statistics(
     return msg
 
 
+def format_category_detail(
+    category: str,
+    period: str,
+    expenses: list[dict[str, Any]],
+    total: float,
+    shown: int,
+    total_count: int,
+) -> str:
+    """Format detailed list of expenses for a category.
+
+    Args:
+        category: Category name
+        period: Period description (e.g., "январь 2026")
+        expenses: List of expense dicts with date, description, amount
+        total: Total amount for category in period
+        shown: Number of items shown so far
+        total_count: Total number of items in category
+    """
+    emoji = get_category_emoji(category)
+
+    if not expenses:
+        return f"{emoji} <b>{category} за {period}</b>\n\nРасходов нет."
+
+    msg = f"{emoji} <b>{category} за {period}</b>\n\n"
+
+    number_emoji = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+    for i, expense in enumerate(expenses):
+        num = number_emoji[i] if i < len(number_emoji) else f"{i + 1}."
+        date = expense.get("date", "")
+        description = expense.get("description", "")
+        amount = expense.get("amount", 0)
+
+        msg += f"{num} {date} | {description} — <b>{amount:,.0f}₽</b>\n"
+
+    msg += f"\n💰 <b>Итого: {total:,.0f}₽</b>"
+
+    if shown < total_count:
+        msg += f" <i>(показано {shown} из {total_count})</i>"
+
+    return msg
+
+
 def format_help_message() -> str:
     """Format help message with examples and instructions."""
     msg = "❓ <b>Как использовать бота</b>\n\n"
