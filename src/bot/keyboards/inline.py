@@ -1,6 +1,13 @@
 """Inline keyboards for the bot."""
 
+from datetime import datetime
+
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+MONTH_NAMES = [
+    "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+]
 
 
 def get_main_menu_keyboard() -> InlineKeyboardMarkup:
@@ -33,13 +40,40 @@ def get_after_add_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_stats_period_keyboard() -> InlineKeyboardMarkup:
-    """Get keyboard for selecting statistics period."""
+    """Get keyboard for selecting statistics period.
+
+    Shows week button + last 4 months (current + 3 past).
+    Month callbacks use format: stats_month_YYYY_MM
+    """
+    now = datetime.now()
+    current_month = now.month  # 1-12
+    current_year = now.year
+
+    # Generate last 4 months (current + 3 past)
+    months = []
+    for i in range(4):
+        month_idx = current_month - i
+        year = current_year
+        if month_idx <= 0:
+            month_idx += 12
+            year -= 1
+        month_name = MONTH_NAMES[month_idx - 1]
+        # Callback: stats_month_YYYY_MM
+        callback = f"stats_month_{year}_{month_idx:02d}"
+        # Current month gets year suffix for clarity
+        label = f"📅 {month_name} {year}" if i == 0 else month_name
+        months.append((label, callback))
+
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="📅 Неделя", callback_data="stats_week"),
-                InlineKeyboardButton(text="📅 Месяц", callback_data="stats_month"),
-                InlineKeyboardButton(text="📅 Год", callback_data="stats_year"),
+                InlineKeyboardButton(text=months[0][0], callback_data=months[0][1]),
+            ],
+            [
+                InlineKeyboardButton(text=months[1][0], callback_data=months[1][1]),
+                InlineKeyboardButton(text=months[2][0], callback_data=months[2][1]),
+                InlineKeyboardButton(text=months[3][0], callback_data=months[3][1]),
             ],
             [
                 InlineKeyboardButton(text="🔙 Назад в меню", callback_data="back_to_menu"),
