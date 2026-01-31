@@ -21,8 +21,18 @@ def test_stats_period_keyboard_has_week_and_months():
     # Should have current month (based on current date)
     now = datetime.now()
     month_names = [
-        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+        "Январь",
+        "Февраль",
+        "Март",
+        "Апрель",
+        "Май",
+        "Июнь",
+        "Июль",
+        "Август",
+        "Сентябрь",
+        "Октябрь",
+        "Ноябрь",
+        "Декабрь",
     ]
     current_month_name = month_names[now.month - 1]
     assert any(current_month_name in b for b in buttons)
@@ -68,3 +78,35 @@ def test_stats_period_keyboard_has_back_button():
     callbacks = [btn.callback_data for row in keyboard.inline_keyboard for btn in row]
 
     assert "back_to_menu" in callbacks
+
+
+def test_category_detail_keyboard_with_more():
+    """Category detail keyboard should show 'more' button when has_more=True."""
+    from src.bot.keyboards.inline import get_category_detail_keyboard
+
+    keyboard = get_category_detail_keyboard(
+        category="Еда",
+        period="2026_01",
+        offset=0,
+        has_more=True,
+    )
+
+    buttons = [btn.text for row in keyboard.inline_keyboard for btn in row]
+    assert any("Показать ещё" in b for b in buttons)
+    assert any("Назад" in b for b in buttons)
+
+
+def test_category_detail_keyboard_without_more():
+    """Category detail keyboard should hide 'more' when has_more=False."""
+    from src.bot.keyboards.inline import get_category_detail_keyboard
+
+    keyboard = get_category_detail_keyboard(
+        category="Еда",
+        period="2026_01",
+        offset=0,
+        has_more=False,
+    )
+
+    buttons = [btn.text for row in keyboard.inline_keyboard for btn in row]
+    assert not any("Показать ещё" in b for b in buttons)
+    assert any("Назад" in b for b in buttons)
