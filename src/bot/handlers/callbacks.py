@@ -9,6 +9,7 @@ from aiogram.types import CallbackQuery
 
 from src.bot.decorators import require_api_client
 from src.bot.formatters import (
+    format_category_detail,
     format_examples_message,
     format_expense_deleted,
     format_expenses_list,
@@ -17,6 +18,8 @@ from src.bot.formatters import (
 )
 from src.bot.keyboards.inline import (
     get_back_to_menu_keyboard,
+    get_back_to_stats_keyboard,
+    get_category_detail_keyboard,
     get_main_menu_keyboard,
     get_stats_period_keyboard,
 )
@@ -37,8 +40,7 @@ async def callback_back_to_menu(callback: CallbackQuery) -> None:
         return
 
     await callback.message.edit_text(
-        "🏠 <b>Главное меню</b>\n\n"
-        "Выберите действие или напишите сообщение:",
+        "🏠 <b>Главное меню</b>\n\nВыберите действие или напишите сообщение:",
         parse_mode="HTML",
         reply_markup=get_main_menu_keyboard(),
     )
@@ -97,9 +99,7 @@ async def callback_show_stats(
             api_client.get(f"/api/limits/{user_id}"),
         )
         limits = limits_result.get("limits", {})
-        logger.info(
-            f"Show stats for user {user_id}: loaded {len(limits)} limits"
-        )
+        logger.info(f"Show stats for user {user_id}: loaded {len(limits)} limits")
 
         stats_text = format_statistics(
             result["statistics"],
@@ -271,8 +271,7 @@ async def callback_confirm_delete(
 
     except Exception as e:
         logger.error(
-            f"Delete callback failed for user {user_id}: "
-            f"{type(e).__name__}: {e}",
+            f"Delete callback failed for user {user_id}: {type(e).__name__}: {e}",
             exc_info=True,
         )
         await callback.message.edit_text(
@@ -348,8 +347,7 @@ async def callback_delete_last(
 
     except Exception as e:
         logger.error(
-            f"Delete callback failed for user {user_id}: "
-            f"{type(e).__name__}: {e}",
+            f"Delete callback failed for user {user_id}: {type(e).__name__}: {e}",
             exc_info=True,
         )
         await callback.message.edit_text(
@@ -374,8 +372,7 @@ async def callback_add_more(callback: CallbackQuery, state: FSMContext) -> None:
 
     # Send new message with reply keyboard
     await callback.message.answer(
-        "💰 <b>Добавление расхода</b>\n\n"
-        "📂 <b>Шаг 1/3:</b> Выбери категорию",
+        "💰 <b>Добавление расхода</b>\n\n📂 <b>Шаг 1/3:</b> Выбери категорию",
         parse_mode="HTML",
         reply_markup=get_categories_keyboard(),
     )
@@ -383,89 +380,175 @@ async def callback_add_more(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data.in_({"stats_week", "stats_month", "stats_year"}))
+@router.callback_query(F.data == "stats_week")
 @require_api_client
 async def callback_stats_period(
     callback: CallbackQuery,
     api_client: ServiceClient | None = None,
 ) -> None:
-    """Handle stats period selection buttons."""
+    """Handle stats week button."""
     if not callback.message or not callback.from_user or not callback.data:
         return
 
-    # Map callback data to (display name, API period)
-    period_map = {
-        "stats_week": ("неделю", "week"),
-        "stats_month": ("месяц", "month"),
-        "stats_year": ("год", "year"),
-    }
-
-    period_name, api_period = period_map.get(callback.data, ("неделю", "week"))
     user_id = str(callback.from_user.id)
 
     await callback.message.edit_text("⏳ Загружаю статистику...")
 
     try:
-        # Fetch stats and limits in parallel (use direct endpoint, not AI)
-        if callback.data == "stats_month":
-            result, limits_result = await asyncio.gather(
-                api_client.get(f"/api/statistics/{user_id}/{api_period}"),
-                api_client.get(f"/api/limits/{user_id}"),
-            )
-            limits = limits_result.get("limits", {})
-            logger.info(
-                f"Stats month for user {user_id}: loaded {len(limits)} limits"
-            )
-        else:
-            result = await api_client.get(f"/api/statistics/{user_id}/{api_period}")
-            limits = None
-
-        logger.info(
-            f"Formatting stats: period={period_name}, "
-            f"limits_count={len(limits) if limits else 0}"
-        )
+        result = await api_client.get(f"/api/statistics/{user_id}/week")
         stats_text = format_statistics(
-            result["statistics"],
-            period=period_name,
-            limits=limits if limits else None,
+            result.get("statistics", {}),
+            period="неделю",
+            limits=None,
         )
 
         await callback.message.edit_text(
             stats_text,
             parse_mode="HTML",
-            reply_markup=get_stats_period_keyboard(),
-        )
-
-    except asyncio.TimeoutError:
-        logger.warning(f"Stats period callback timeout for user {user_id}")
-        await callback.message.edit_text(
-            "Запрос занял слишком много времени. Попробуйте позже.",
-            reply_markup=get_back_to_menu_keyboard(),
-        )
-
-    except ServiceUnavailableError:
-        logger.warning(f"Service unavailable for stats period from user {user_id}")
-        await callback.message.edit_text(
-            "Сервис временно недоступен. Попробуйте позже.",
-            reply_markup=get_back_to_menu_keyboard(),
-        )
-
-    except QuotaExceededError:
-        logger.warning(f"Quota exceeded for stats period from user {user_id}")
-        await callback.message.edit_text(
-            "Превышен лимит запросов. Подождите минуту.",
-            reply_markup=get_back_to_menu_keyboard(),
+            reply_markup=get_back_to_stats_keyboard(),
         )
 
     except Exception as e:
-        logger.error(
-            f"Stats period callback failed for user {user_id}: "
-            f"{type(e).__name__}: {e}",
-            exc_info=True,
-        )
+        logger.error(f"Stats week callback failed: {e}", exc_info=True)
         await callback.message.edit_text(
-            "Не удалось получить статистику. Попробуйте позже.",
+            "Не удалось получить статистику.",
             reply_markup=get_back_to_menu_keyboard(),
         )
 
     await callback.answer()
+
+
+@router.callback_query(F.data == "stats_select_period")
+async def callback_stats_select_period(callback: CallbackQuery) -> None:
+    """Show period selection keyboard."""
+    if not callback.message:
+        return
+
+    await callback.message.edit_text(
+        "📊 <b>Статистика</b>\n\nВыберите период:",
+        parse_mode="HTML",
+        reply_markup=get_stats_period_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("stats_month_"))
+@require_api_client
+async def callback_stats_specific_month(
+    callback: CallbackQuery,
+    api_client: ServiceClient | None = None,
+) -> None:
+    """Handle specific month stats button (stats_month_YYYY_MM)."""
+    if not callback.message or not callback.from_user or not callback.data:
+        return
+
+    # Parse: stats_month_2026_01 -> year=2026, month=01
+    parts = callback.data.split("_")
+    year = parts[2]
+    month = parts[3]
+    period = f"{year}_{month}"
+
+    user_id = str(callback.from_user.id)
+
+    await callback.message.edit_text("⏳ Загружаю статистику...")
+
+    try:
+        # Fetch stats and limits
+        result_raw, limits_result = await asyncio.gather(
+            api_client.get(
+                f"/api/statistics/{user_id}/month",
+                params={"period": period},
+            ),
+            api_client.get(f"/api/limits/{user_id}"),
+        )
+        result = result_raw.get("statistics", {})
+        limits = limits_result.get("limits", {})
+
+        period_display = _format_period_display(period)
+        stats_text = format_statistics(
+            result,
+            period=period_display,
+            limits=limits,
+        )
+
+        await callback.message.edit_text(
+            stats_text,
+            parse_mode="HTML",
+            reply_markup=get_back_to_stats_keyboard(),
+        )
+    except Exception as e:
+        logger.error(f"Stats month callback failed: {e}", exc_info=True)
+        await callback.message.edit_text(
+            "Не удалось получить статистику.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("cat_more_"))
+@require_api_client
+async def callback_category_more(
+    callback: CallbackQuery,
+    api_client: ServiceClient | None = None,
+) -> None:
+    """Handle 'show more' in category detail (cat_more_Category_period_offset)."""
+    if not callback.message or not callback.from_user or not callback.data:
+        return
+
+    # Parse: cat_more_Еда_2026_01_10 -> category=Еда, period=2026_01, offset=10
+    parts = callback.data.split("_")
+    category = parts[2]
+    period = f"{parts[3]}_{parts[4]}"
+    offset = int(parts[5])
+
+    user_id = str(callback.from_user.id)
+
+    try:
+        result = await api_client.get(
+            f"/api/expenses/{user_id}/{category}",
+            params={"period": period, "limit": 10, "offset": offset},
+        )
+
+        period_display = _format_period_display(period)
+        text = format_category_detail(
+            category=category,
+            period=period_display,
+            expenses=result.get("expenses", []),
+            total=result.get("total", 0),
+            shown=offset + result.get("count", 0),
+            total_count=result.get("total_count", 0),
+        )
+
+        keyboard = get_category_detail_keyboard(
+            category=category,
+            period=period,
+            offset=offset,
+            has_more=result.get("has_more", False),
+        )
+
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=keyboard,
+        )
+    except Exception as e:
+        logger.error(f"Category more callback failed: {e}", exc_info=True)
+        await callback.message.edit_text(
+            "Не удалось загрузить данные.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    await callback.answer()
+
+
+def _format_period_display(period: str) -> str:
+    """Convert period code to display string."""
+    if period == "week":
+        return "неделю"
+    if "_" in period:
+        year, month = period.split("_")
+        from src.bot.keyboards.inline import MONTH_NAMES
+
+        return f"{MONTH_NAMES[int(month) - 1]} {year}"
+    return period
