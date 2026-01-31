@@ -28,6 +28,7 @@ from src.bot.keyboards.inline import (
     get_confirm_delete_keyboard,
     get_stats_period_keyboard,
 )
+from src.bot.utils import format_period_display
 from src.core.categories import VALID_CATEGORIES
 from src.core.exceptions import QuotaExceededError, ServiceUnavailableError
 from src.core.http_client import ServiceClient
@@ -119,7 +120,7 @@ async def cmd_stats(
                 params={"period": period, "limit": 10, "offset": 0},
             )
 
-            period_display = _format_period_display(period)
+            period_display = format_period_display(period)
             text = format_category_detail(
                 category=category,
                 period=period_display,
@@ -151,7 +152,7 @@ async def cmd_stats(
                 )
                 result = result_raw.get("statistics", {})
                 limits = limits_result.get("limits", {})
-                period_display = _format_period_display(period)
+                period_display = format_period_display(period)
 
             text = format_statistics(
                 result,
@@ -175,18 +176,6 @@ async def cmd_stats(
     except Exception as e:
         logger.error(f"Stats request failed: {e}", exc_info=True)
         await message.answer("Не удалось получить статистику. Попробуйте позже.")
-
-
-def _format_period_display(period: str) -> str:
-    """Convert period code to display string."""
-    if period == "week":
-        return "неделю"
-    if "_" in period:
-        year, month = period.split("_")
-        from src.bot.keyboards.inline import MONTH_NAMES
-
-        return f"{MONTH_NAMES[int(month) - 1]} {year}"
-    return period
 
 
 @router.message(Command("last"))

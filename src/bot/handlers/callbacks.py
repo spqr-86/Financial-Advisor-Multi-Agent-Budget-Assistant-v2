@@ -25,6 +25,7 @@ from src.bot.keyboards.inline import (
 )
 from src.bot.keyboards.reply import get_categories_keyboard
 from src.bot.states import AddExpenseStates
+from src.bot.utils import format_period_display
 from src.core.exceptions import QuotaExceededError, ServiceUnavailableError
 from src.core.http_client import ServiceClient
 
@@ -464,7 +465,7 @@ async def callback_stats_specific_month(
         result = result_raw.get("statistics", {})
         limits = limits_result.get("limits", {})
 
-        period_display = _format_period_display(period)
+        period_display = format_period_display(period)
         stats_text = format_statistics(
             result,
             period=period_display,
@@ -510,7 +511,7 @@ async def callback_category_more(
             params={"period": period, "limit": 10, "offset": offset},
         )
 
-        period_display = _format_period_display(period)
+        period_display = format_period_display(period)
         text = format_category_detail(
             category=category,
             period=period_display,
@@ -540,15 +541,3 @@ async def callback_category_more(
         )
 
     await callback.answer()
-
-
-def _format_period_display(period: str) -> str:
-    """Convert period code to display string."""
-    if period == "week":
-        return "неделю"
-    if "_" in period:
-        year, month = period.split("_")
-        from src.bot.keyboards.inline import MONTH_NAMES
-
-        return f"{MONTH_NAMES[int(month) - 1]} {year}"
-    return period

@@ -8,6 +8,31 @@ from aiogram.types import InlineKeyboardMarkup, Message
 from src.core.constants import MESSAGE_CHUNK_DELAY, TELEGRAM_MAX_MESSAGE_LENGTH
 
 
+def format_period_display(period: str) -> str:
+    """Convert period code to display string.
+
+    Args:
+        period: Period code ("week" or "YYYY_MM")
+
+    Returns:
+        Human-readable period string in Russian
+
+    Examples:
+        >>> format_period_display("week")
+        'неделю'
+        >>> format_period_display("2026_01")
+        'Январь 2026'
+    """
+    if period == "week":
+        return "неделю"
+    if "_" in period:
+        from src.bot.keyboards.inline import MONTH_NAMES
+
+        year, month = period.split("_")
+        return f"{MONTH_NAMES[int(month) - 1]} {year}"
+    return period
+
+
 def split_long_message(text: str, max_length: int = TELEGRAM_MAX_MESSAGE_LENGTH) -> List[str]:
     """
     Split long message into chunks that fit Telegram's message length limit.
