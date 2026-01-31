@@ -11,6 +11,7 @@ from src.bot.config import settings
 from src.bot.handlers import callbacks, commands, structured
 from src.bot.handlers import router as main_router
 from src.bot.middlewares import APIClientMiddleware
+from src.core.constants import MAX_RETRIES, REQUEST_TIMEOUT
 from src.core.http_client import ServiceClient
 
 logging.basicConfig(
@@ -42,8 +43,8 @@ async def main():
     # Setup API client middleware
     api_client = ServiceClient(
         base_url=settings.budget_api_url,
-        timeout=30,
-        max_retries=3,
+        timeout=REQUEST_TIMEOUT,
+        max_retries=MAX_RETRIES,
     )
     dp.message.middleware(APIClientMiddleware(api_client))
     dp.callback_query.middleware(APIClientMiddleware(api_client))

@@ -1,9 +1,11 @@
 """Bot utility functions."""
 
+import asyncio
 from typing import List
 
-# Telegram message limit
-TELEGRAM_MAX_MESSAGE_LENGTH = 4096
+from aiogram.types import InlineKeyboardMarkup, Message
+
+from src.core.constants import MESSAGE_CHUNK_DELAY, TELEGRAM_MAX_MESSAGE_LENGTH
 
 
 def split_long_message(text: str, max_length: int = TELEGRAM_MAX_MESSAGE_LENGTH) -> List[str]:
@@ -77,3 +79,30 @@ def split_long_message(text: str, max_length: int = TELEGRAM_MAX_MESSAGE_LENGTH)
         chunks.append(current_chunk.strip())
 
     return chunks
+
+
+async def send_chunked_message(
+    message: Message,
+    text: str,
+    keyboard: InlineKeyboardMarkup | None = None,
+    parse_mode: str = "HTML",
+) -> None:
+    """Send a long message in chunks with optional keyboard on last chunk.
+
+    Args:
+        message: The message to reply to
+        text: Text to send (will be split if too long)
+        keyboard: Optional keyboard to attach to the last chunk
+        parse_mode: Parse mode for the message (default: HTML)
+    """
+    chunks = split_long_message(text)
+
+    for i, chunk in enumerate(chunks):
+        is_last = i == len(chunks) - 1
+        await message.answer(
+            chunk,
+            parse_mode=parse_mode,
+            reply_markup=keyboard if is_last else None,
+        )
+        if not is_last:
+            await asyncio.sleep(MESSAGE_CHUNK_DELAY)

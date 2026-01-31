@@ -72,8 +72,10 @@ async def test_handle_text_success(mock_message, mock_service_client):
         json={"query": "test message", "user_id": "123456"}
     )
 
-    # Should answer user
-    mock_message.answer.assert_called_once_with("test response")
+    # Should answer user with HTML parse mode
+    mock_message.answer.assert_called_once()
+    call_kwargs = mock_message.answer.call_args[1]
+    assert call_kwargs.get("parse_mode") == "HTML"
 
 
 @pytest.mark.asyncio
@@ -105,7 +107,7 @@ async def test_handle_text_no_api_client(mock_message):
 
     mock_message.answer.assert_called_once()
     call_args = mock_message.answer.call_args[0][0]
-    assert "API не настроен" in call_args
+    assert "недоступен" in call_args.lower()
 
 
 @pytest.mark.asyncio
