@@ -11,6 +11,7 @@ from google.oauth2.service_account import Credentials
 
 from src.core.cache import limits_cache
 from src.core.categories import VALID_CATEGORIES
+from src.core.constants import WORKSHEET_EXPENSES, WORKSHEET_LIMITS
 from src.mcp.config import settings
 from src.mcp.storage.interface import StorageInterface
 
@@ -95,7 +96,7 @@ class GoogleSheetsStorage(StorageInterface):
         """Get the main expenses worksheet."""
         await self._connect()
 
-        worksheet_name = "Траты и бюджет"
+        worksheet_name = WORKSHEET_EXPENSES
 
         try:
             worksheet = await self._run_sync(
@@ -114,7 +115,7 @@ class GoogleSheetsStorage(StorageInterface):
         """Get or create the limits worksheet."""
         await self._connect()
 
-        worksheet_name = "Лимиты"
+        worksheet_name = WORKSHEET_LIMITS
 
         try:
             worksheet = await self._run_sync(

@@ -8,10 +8,15 @@ from fastapi import APIRouter, Depends
 from src.core.schemas import (
     AddExpenseRequest,
     DeleteLastExpenseRequest,
+    DeleteLimitRequest,
     GetExpensesRequest,
+    GetLimitsRequest,
     GetStatisticsRequest,
+    LimitResponse,
+    LimitsResponse,
     QueryRequest,
     QueryResponse,
+    SetLimitRequest,
 )
 from src.mcp.agents import ADKBudgetAgent
 from src.mcp.storage import GoogleSheetsStorage, StorageInterface
@@ -181,34 +186,35 @@ async def storage_health(
     return result
 
 
-@router.post("/limits")
+@router.post("/limits", response_model=LimitsResponse)
 async def get_limits(
-    request: dict,
+    request: GetLimitsRequest,
     storage: StorageInterface = Depends(get_storage),
-) -> dict:
+) -> LimitsResponse:
     """Get all budget limits."""
-    user_id = request.get("user_id", "default")
-    return await storage.get_limits(user_id)
+    result = await storage.get_limits(request.user_id)
+    return LimitsResponse(**result)
 
 
-@router.post("/limits/set")
+@router.post("/limits/set", response_model=LimitResponse)
 async def set_limit(
-    request: dict,
+    request: SetLimitRequest,
     storage: StorageInterface = Depends(get_storage),
-) -> dict:
+) -> LimitResponse:
     """Set a budget limit."""
-    user_id = request.get("user_id", "default")
-    category = request.get("category")
-    amount = request.get("amount", 0)
-    return await storage.set_limit(user_id, category, amount)
+    result = await storage.set_limit(
+        request.user_id,
+        request.category,
+        request.amount,
+    )
+    return LimitResponse(**result)
 
 
-@router.post("/limits/delete")
+@router.post("/limits/delete", response_model=LimitResponse)
 async def delete_limit(
-    request: dict,
+    request: DeleteLimitRequest,
     storage: StorageInterface = Depends(get_storage),
-) -> dict:
+) -> LimitResponse:
     """Delete a budget limit."""
-    user_id = request.get("user_id", "default")
-    category = request.get("category")
-    return await storage.delete_limit(user_id, category)
+    result = await storage.delete_limit(request.user_id, request.category)
+    return LimitResponse(**result)
