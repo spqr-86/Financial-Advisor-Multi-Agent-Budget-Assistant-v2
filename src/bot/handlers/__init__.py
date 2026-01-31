@@ -72,43 +72,49 @@ async def handle_text(
     logger.info(f"[{req_id}] Processing query from user {user_id}: {query_preview}")
 
     try:
-        # Check if this is a monthly stats request (to load limits)
+        # Check if this is a stats request (to use direct endpoint with limits)
         query_lower = message.text.lower()
-        is_monthly_stats = (
-            "месяц" in query_lower
-            and any(kw in query_lower for kw in ["статистик", "расход", "потратил"])
+        is_stats_request = any(
+            kw in query_lower for kw in ["статистик", "расход", "потратил", "сколько"]
         )
 
-        if is_monthly_stats:
-            # Fetch stats and limits in parallel for monthly stats
-            result, limits_result = await asyncio.gather(
-                api_client.post(
-                    "/api/query",
-                    json={"query": message.text, "user_id": user_id},
-                ),
-                api_client.get(f"/api/limits/{user_id}"),
-            )
-            limits = limits_result.get("limits", {})
-            logger.info(
-                f"[{req_id}] Monthly stats for user {user_id}: "
-                f"loaded {len(limits)} limits"
+        # Determine period from query
+        if "год" in query_lower:
+            api_period, period_name = "year", "год"
+        elif "месяц" in query_lower:
+            api_period, period_name = "month", "месяц"
+        else:
+            api_period, period_name = "week", "неделю"
+
+        is_monthly = api_period == "month"
+
+        if is_stats_request:
+            # Use direct statistics endpoint (faster, structured data)
+            if is_monthly:
+                result, limits_result = await asyncio.gather(
+                    api_client.get(f"/api/statistics/{user_id}/{api_period}"),
+                    api_client.get(f"/api/limits/{user_id}"),
+                )
+                limits = limits_result.get("limits", {})
+                logger.info(
+                    f"[{req_id}] Monthly stats for user {user_id}: "
+                    f"loaded {len(limits)} limits"
+                )
+            else:
+                result = await api_client.get(f"/api/statistics/{user_id}/{api_period}")
+                limits = None
+
+            response = format_statistics(
+                result["statistics"],
+                period=period_name,
+                limits=limits if limits else None,
             )
         else:
+            # Regular query - use AI agent
             result = await api_client.post(
                 "/api/query",
                 json={"query": message.text, "user_id": user_id},
             )
-            limits = None
-
-        # If response contains statistics data, format it properly with limits
-        if "statistics" in result:
-            period = "месяц" if is_monthly_stats else "неделю"
-            response = format_statistics(
-                result["statistics"],
-                period=period,
-                limits=limits if limits else None,
-            )
-        else:
             response = result.get("response", "Нет ответа")
 
         logger.info(f"[{req_id}] Response for user {user_id}: {len(response)} chars")

@@ -91,15 +91,9 @@ async def callback_show_stats(
     await callback.message.edit_text("⏳ Загружаю статистику...")
 
     try:
-        # Fetch stats and limits in parallel (monthly stats with limits)
+        # Fetch stats and limits in parallel (use direct endpoint, not AI)
         result, limits_result = await asyncio.gather(
-            api_client.post(
-                "/api/query",
-                json={
-                    "query": "покажи статистику за месяц",
-                    "user_id": user_id,
-                },
-            ),
+            api_client.get(f"/api/statistics/{user_id}/month"),
             api_client.get(f"/api/limits/{user_id}"),
         )
         limits = limits_result.get("limits", {})
@@ -107,14 +101,11 @@ async def callback_show_stats(
             f"Show stats for user {user_id}: loaded {len(limits)} limits"
         )
 
-        if "statistics" in result:
-            stats_text = format_statistics(
-                result["statistics"],
-                period="месяц",
-                limits=limits if limits else None,
-            )
-        else:
-            stats_text = result.get("response", "Нет данных")
+        stats_text = format_statistics(
+            result["statistics"],
+            period="месяц",
+            limits=limits if limits else None,
+        )
 
         await callback.message.edit_text(
             stats_text,
@@ -402,51 +393,42 @@ async def callback_stats_period(
     if not callback.message or not callback.from_user or not callback.data:
         return
 
+    # Map callback data to (display name, API period)
     period_map = {
-        "stats_week": ("неделю", "покажи статистику за неделю"),
-        "stats_month": ("месяц", "покажи статистику за месяц"),
-        "stats_year": ("год", "покажи статистику за год"),
+        "stats_week": ("неделю", "week"),
+        "stats_month": ("месяц", "month"),
+        "stats_year": ("год", "year"),
     }
 
-    period_name, query = period_map.get(callback.data, ("неделю", "покажи статистику"))
+    period_name, api_period = period_map.get(callback.data, ("неделю", "week"))
     user_id = str(callback.from_user.id)
 
     await callback.message.edit_text("⏳ Загружаю статистику...")
 
     try:
-        # Fetch stats and limits in parallel for monthly stats
+        # Fetch stats and limits in parallel (use direct endpoint, not AI)
         if callback.data == "stats_month":
             result, limits_result = await asyncio.gather(
-                api_client.post(
-                    "/api/query",
-                    json={"query": query, "user_id": user_id},
-                ),
+                api_client.get(f"/api/statistics/{user_id}/{api_period}"),
                 api_client.get(f"/api/limits/{user_id}"),
             )
             limits = limits_result.get("limits", {})
             logger.info(
-                f"Stats month for user {user_id}: "
-                f"limits_result={limits_result}, limits={limits}"
+                f"Stats month for user {user_id}: loaded {len(limits)} limits"
             )
         else:
-            result = await api_client.post(
-                "/api/query",
-                json={"query": query, "user_id": user_id},
-            )
+            result = await api_client.get(f"/api/statistics/{user_id}/{api_period}")
             limits = None
 
-        if "statistics" in result:
-            logger.info(
-                f"Formatting stats: period={period_name}, "
-                f"limits_count={len(limits) if limits else 0}"
-            )
-            stats_text = format_statistics(
-                result["statistics"],
-                period=period_name,
-                limits=limits if limits else None,
-            )
-        else:
-            stats_text = result.get("response", "Нет данных")
+        logger.info(
+            f"Formatting stats: period={period_name}, "
+            f"limits_count={len(limits) if limits else 0}"
+        )
+        stats_text = format_statistics(
+            result["statistics"],
+            period=period_name,
+            limits=limits if limits else None,
+        )
 
         await callback.message.edit_text(
             stats_text,

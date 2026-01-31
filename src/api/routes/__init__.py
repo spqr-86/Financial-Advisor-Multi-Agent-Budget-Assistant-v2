@@ -135,3 +135,30 @@ async def delete_limit(user_id: str, category: str) -> LimitResponse:
         category=category,
         deleted=True,
     )
+
+
+@router.get("/statistics/{user_id}/{period}")
+async def get_statistics(user_id: str, period: str = "month") -> dict:
+    """Get expense statistics directly from storage.
+
+    Returns structured data for formatting with limits.
+    """
+    from src.api.app import get_mcp_client
+
+    logger.info(f"Getting statistics for user {user_id}, period: {period}")
+
+    mcp_client = get_mcp_client()
+    result = await mcp_client.post(
+        "/mcp/storage/statistics",
+        json={"user_id": user_id, "period": period},
+    )
+
+    # Convert to format expected by format_statistics
+    return {
+        "statistics": {
+            "categories": result.get("by_category", {}),
+            "total": result.get("total", 0),
+        },
+        "user_id": user_id,
+        "period": period,
+    }
