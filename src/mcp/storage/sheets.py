@@ -312,8 +312,17 @@ class GoogleSheetsStorage(StorageInterface):
             if category:
                 records = [r for r in records if r.get("Категория") == category]
 
-            # Apply limit (get last N records)
-            records = records[-limit:] if len(records) > limit else records
+            # Sort by date (newest first)
+            def parse_date(record: dict) -> datetime:
+                try:
+                    return datetime.strptime(record.get("Дата", ""), "%d.%m.%Y")
+                except (ValueError, TypeError):
+                    return datetime.min
+
+            records.sort(key=parse_date, reverse=True)
+
+            # Apply limit (get first N records after sorting)
+            records = records[:limit]
 
             return {
                 "status": "success",
