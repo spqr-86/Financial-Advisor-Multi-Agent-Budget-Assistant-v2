@@ -24,6 +24,7 @@ async def add_expense_tool(
     amount: float,
     description: str,
     user_id: str = "default",
+    date: str | None = None,
 ) -> dict[str, Any]:
     """
     Добавить расход в бюджет.
@@ -36,18 +37,31 @@ async def add_expense_tool(
         amount: Сумма в рублях (число, например 150.50)
         description: Описание покупки (например "хлеб и молоко", "проезд на метро")
         user_id: ID пользователя (опционально)
+        date: Дата расхода в формате DD.MM.YYYY (опционально, по умолчанию сегодня)
 
     Returns:
         Результат добавления расхода
     """
+    from datetime import datetime
+
     storage = get_storage()
+
+    # Parse date if provided
+    expense_date = None
+    if date:
+        try:
+            expense_date = datetime.strptime(date, "%d.%m.%Y")
+        except ValueError:
+            logger.warning(f"Invalid date format: {date}, using today")
+
     result = await storage.add_expense(
         user_id=user_id,
         category=category,
         amount=amount,
         description=description,
+        date=expense_date,
     )
-    logger.info(f"AI added expense: {category} - {amount}")
+    logger.info(f"AI added expense: {category} - {amount} (date: {date or 'today'})")
     return result
 
 
