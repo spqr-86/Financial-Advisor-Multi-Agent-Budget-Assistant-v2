@@ -20,6 +20,7 @@ from src.bot.keyboards.inline import (
     get_back_to_menu_keyboard,
     get_back_to_stats_keyboard,
     get_category_detail_keyboard,
+    get_category_period_keyboard,
     get_main_menu_keyboard,
     get_stats_period_keyboard,
 )
@@ -481,6 +482,85 @@ async def callback_stats_specific_month(
         logger.error(f"Stats month callback failed: {e}", exc_info=True)
         await callback.message.edit_text(
             "Не удалось получить статистику.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("cat_select_"))
+async def callback_category_select(callback: CallbackQuery) -> None:
+    """Handle back to category period selection (cat_select_Category)."""
+    if not callback.message or not callback.data:
+        return
+
+    # Parse: cat_select_Еда -> category=Еда
+    category = callback.data.replace("cat_select_", "")
+
+    from src.core.categories import get_category_emoji
+
+    emoji = get_category_emoji(category)
+    text = f"{emoji} <b>{category}</b>\n\nВыберите период:"
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=get_category_period_keyboard(category),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("cat_period_"))
+@require_api_client
+async def callback_category_period(
+    callback: CallbackQuery,
+    api_client: ServiceClient | None = None,
+) -> None:
+    """Handle category period selection (cat_period_Category_YYYY_MM)."""
+    if not callback.message or not callback.from_user or not callback.data:
+        return
+
+    # Parse: cat_period_Еда_2026_01 -> category=Еда, period=2026_01
+    parts = callback.data.split("_")
+    category = parts[2]
+    period = f"{parts[3]}_{parts[4]}"
+
+    user_id = str(callback.from_user.id)
+
+    await callback.message.edit_text("⏳ Загружаю траты...")
+
+    try:
+        result = await api_client.get(
+            f"/api/expenses/{user_id}/{category}",
+            params={"period": period, "limit": 10, "offset": 0},
+        )
+
+        period_display = format_period_display(period)
+        text = format_category_detail(
+            category=category,
+            period=period_display,
+            expenses=result.get("expenses", []),
+            total=result.get("total", 0),
+            shown=result.get("count", 0),
+            total_count=result.get("total_count", 0),
+        )
+
+        keyboard = get_category_detail_keyboard(
+            category=category,
+            period=period,
+            offset=0,
+            has_more=result.get("has_more", False),
+        )
+
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=keyboard,
+        )
+    except Exception as e:
+        logger.error(f"Category period callback failed: {e}", exc_info=True)
+        await callback.message.edit_text(
+            "Не удалось загрузить данные.",
             reply_markup=get_back_to_menu_keyboard(),
         )
 

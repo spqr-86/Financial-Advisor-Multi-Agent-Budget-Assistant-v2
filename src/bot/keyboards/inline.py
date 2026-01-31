@@ -146,9 +146,12 @@ def get_category_detail_keyboard(
             ]
         )
 
+    # Back to category period selection
     buttons.append(
         [
-            InlineKeyboardButton(text="🔙 Назад", callback_data="stats_select_period"),
+            InlineKeyboardButton(
+                text="🔙 Назад", callback_data=f"cat_select_{category}"
+            ),
         ]
     )
 
@@ -163,6 +166,51 @@ def get_back_to_stats_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="🔙 Выбрать период", callback_data="stats_select_period"
                 )
+            ],
+        ]
+    )
+
+
+def get_category_period_keyboard(category: str) -> InlineKeyboardMarkup:
+    """Get keyboard for selecting period when viewing category expenses.
+
+    Args:
+        category: Category name to view
+
+    Shows last 4 months for selecting period.
+    Callbacks use format: cat_period_{category}_{YYYY}_{MM}
+    """
+    now = datetime.now()
+    current_month = now.month
+    current_year = now.year
+
+    # Generate last 4 months
+    months = []
+    for i in range(4):
+        month_idx = current_month - i
+        year = current_year
+        if month_idx <= 0:
+            month_idx += 12
+            year -= 1
+        month_name = MONTH_NAMES[month_idx - 1]
+        callback = f"cat_period_{category}_{year}_{month_idx:02d}"
+        label = f"📅 {month_name} {year}" if i == 0 else month_name
+        months.append((label, callback))
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=months[0][0], callback_data=months[0][1]),
+                InlineKeyboardButton(text=months[1][0], callback_data=months[1][1]),
+            ],
+            [
+                InlineKeyboardButton(text=months[2][0], callback_data=months[2][1]),
+                InlineKeyboardButton(text=months[3][0], callback_data=months[3][1]),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🔙 Назад", callback_data="stats_select_period"
+                ),
             ],
         ]
     )

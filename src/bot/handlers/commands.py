@@ -25,6 +25,7 @@ from src.bot.keyboards.inline import (
     get_back_to_menu_keyboard,
     get_back_to_stats_keyboard,
     get_category_detail_keyboard,
+    get_category_period_keyboard,
     get_confirm_delete_keyboard,
     get_stats_period_keyboard,
 )
@@ -112,9 +113,8 @@ async def cmd_stats(
     await message.bot.send_chat_action(message.chat.id, "typing")
 
     try:
-        if category:
-            # Show category detail
-            period = period or f"{datetime.now().year}_{datetime.now().month:02d}"
+        if category and period:
+            # Show category detail for specific period
             result = await api_client.get(
                 f"/api/expenses/{user_id}/{category}",
                 params={"period": period, "limit": 10, "offset": 0},
@@ -135,6 +135,13 @@ async def cmd_stats(
                 offset=0,
                 has_more=result.get("has_more", False),
             )
+        elif category:
+            # Category without period - show period selection
+            from src.core.categories import get_category_emoji
+
+            emoji = get_category_emoji(category)
+            text = f"{emoji} <b>{category}</b>\n\nВыберите период:"
+            keyboard = get_category_period_keyboard(category)
         elif period:
             # Show stats for specific period
             if period == "week":

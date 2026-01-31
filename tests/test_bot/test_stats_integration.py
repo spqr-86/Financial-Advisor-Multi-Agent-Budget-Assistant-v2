@@ -7,7 +7,7 @@ from aiogram.types import Message, CallbackQuery
 @pytest.mark.asyncio
 async def test_stats_flow_no_args():
     """Test /stats with no args shows period selection."""
-    with patch("src.bot.decorators.require_api_client", lambda f: f):
+    with patch("src.bot.handlers.commands.require_api_client", lambda f: f):
         from src.bot.handlers.commands import cmd_stats
 
         message = AsyncMock(spec=Message)
@@ -19,7 +19,14 @@ async def test_stats_flow_no_args():
         message.chat.id = 456
         message.bot.send_chat_action = AsyncMock()
 
-        await cmd_stats(message)
+        # If it was already imported, we might need to use the imported one
+        # but the patch on src.bot.handlers.commands.require_api_client (if I used that)
+        # would only work if applied before decoration.
+
+        # Let's try to pass the api_client even if it's not used to satisfy the decorator
+        # if it's not actually patched.
+        api_client = AsyncMock()
+        await cmd_stats(message, api_client=api_client)
 
     # Verify period selection keyboard was sent
     message.answer.assert_called_once()
@@ -30,13 +37,39 @@ async def test_stats_flow_no_args():
 
 @pytest.mark.asyncio
 async def test_stats_flow_with_category():
-    """Test /stats Еда shows category detail."""
+    """Test /stats Еда shows period selection for category."""
     from src.bot.handlers.commands import cmd_stats
 
     message = AsyncMock(spec=Message)
     message.from_user = MagicMock()
     message.from_user.id = 123
     message.text = "/stats Еда"
+    message.answer = AsyncMock()
+    message.chat = MagicMock()
+    message.chat.id = 456
+    message.bot.send_chat_action = AsyncMock()
+
+    api_client = AsyncMock()
+
+    with patch("src.bot.handlers.commands.require_api_client", lambda f: f):
+        await cmd_stats(message, api_client=api_client)
+
+    # Verify period selection for category was shown
+    message.answer.assert_called_once()
+    args, kwargs = message.answer.call_args
+    assert "Еда" in args[0]
+    assert "Выберите период" in args[0]
+
+
+@pytest.mark.asyncio
+async def test_stats_flow_with_category_and_period():
+    """Test /stats Еда январь shows category detail."""
+    from src.bot.handlers.commands import cmd_stats
+
+    message = AsyncMock(spec=Message)
+    message.from_user = MagicMock()
+    message.from_user.id = 123
+    message.text = "/stats Еда январь"
     message.answer = AsyncMock()
     message.chat = MagicMock()
     message.chat.id = 456
