@@ -57,6 +57,14 @@ class AgentError(BudgetException):
     code = "AGENT_ERROR"
 
 
+class QuotaExceededError(BudgetException):
+    """Raised when API quota is exceeded."""
+
+    status_code = 429
+    detail = "API quota exceeded"
+    code = "QUOTA_EXCEEDED"
+
+
 async def budget_exception_handler(
     request: Request, exc: BudgetException
 ) -> JSONResponse:

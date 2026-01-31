@@ -1,7 +1,7 @@
 """Structured input handlers with FSM for step-by-step expense adding."""
 
+import asyncio
 import logging
-import re
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -17,6 +17,7 @@ from src.bot.keyboards import (
 )
 from src.bot.states import AddExpenseStates
 from src.core.categories import parse_category_with_emoji
+from src.core.exceptions import QuotaExceededError, ServiceUnavailableError
 from src.core.http_client import ServiceClient
 
 logger = logging.getLogger(__name__)
@@ -214,6 +215,30 @@ async def add_finish(
         )
 
         # Clear state
+        await state.clear()
+
+    except asyncio.TimeoutError:
+        logger.warning(f"Add expense timeout for user {user_id}")
+        await message.answer(
+            "❌ Запрос занял слишком много времени. Попробуй позже.",
+            parse_mode="HTML",
+        )
+        await state.clear()
+
+    except ServiceUnavailableError:
+        logger.warning(f"Service unavailable for add expense from user {user_id}")
+        await message.answer(
+            "❌ Сервис временно недоступен. Попробуй позже.",
+            parse_mode="HTML",
+        )
+        await state.clear()
+
+    except QuotaExceededError:
+        logger.warning(f"Quota exceeded for add expense from user {user_id}")
+        await message.answer(
+            "❌ Превышен лимит запросов. Подожди минуту.",
+            parse_mode="HTML",
+        )
         await state.clear()
 
     except Exception as e:

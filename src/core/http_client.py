@@ -8,7 +8,7 @@ from typing import Any
 import aiohttp
 from aiohttp import ClientTimeout
 
-from src.core.exceptions import ServiceUnavailableError
+from src.core.exceptions import QuotaExceededError, ServiceUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,12 @@ class ServiceClient:
 
                 async with session.request(method, url, **kwargs) as response:
                     elapsed = time.time() - start_time
+
+                    if response.status == 429:
+                        logger.warning(
+                            f"Quota exceeded from {url} after {elapsed:.2f}s"
+                        )
+                        raise QuotaExceededError("API quota exceeded")
 
                     if response.status >= 500:
                         logger.warning(

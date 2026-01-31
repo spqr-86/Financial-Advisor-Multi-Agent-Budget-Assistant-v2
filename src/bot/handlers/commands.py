@@ -7,6 +7,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
+from src.bot.decorators import require_api_client
 from src.bot.formatters import (
     CATEGORY_EMOJI,
     format_examples_message,
@@ -17,12 +18,12 @@ from src.bot.formatters import (
     format_limits,
     format_statistics,
 )
-from src.bot.decorators import require_api_client
 from src.bot.keyboards.inline import (
     get_back_to_menu_keyboard,
     get_confirm_delete_keyboard,
     get_stats_period_keyboard,
 )
+from src.core.exceptions import QuotaExceededError, ServiceUnavailableError
 from src.core.http_client import ServiceClient
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,18 @@ async def cmd_stats(
             reply_markup=get_stats_period_keyboard(),
         )
 
+    except asyncio.TimeoutError:
+        logger.warning(f"Stats request timeout for user {user_id}")
+        await message.answer("Запрос занял слишком много времени. Попробуйте позже.")
+
+    except ServiceUnavailableError:
+        logger.warning(f"Service unavailable for stats request from user {user_id}")
+        await message.answer("Сервис временно недоступен. Попробуйте позже.")
+
+    except QuotaExceededError:
+        logger.warning(f"Quota exceeded for stats request from user {user_id}")
+        await message.answer("Превышен лимит запросов. Подождите минуту.")
+
     except Exception as e:
         logger.error(
             f"Stats request failed for user {user_id}: {type(e).__name__}: {e}",
@@ -129,6 +142,18 @@ async def cmd_last(
             parse_mode="HTML",
             reply_markup=get_back_to_menu_keyboard(),
         )
+
+    except asyncio.TimeoutError:
+        logger.warning(f"Last expenses request timeout for user {user_id}")
+        await message.answer("Запрос занял слишком много времени. Попробуйте позже.")
+
+    except ServiceUnavailableError:
+        logger.warning(f"Service unavailable for last request from user {user_id}")
+        await message.answer("Сервис временно недоступен. Попробуйте позже.")
+
+    except QuotaExceededError:
+        logger.warning(f"Quota exceeded for last request from user {user_id}")
+        await message.answer("Превышен лимит запросов. Подождите минуту.")
 
     except Exception as e:
         logger.error(
@@ -246,6 +271,18 @@ async def cmd_limit(
                 "Пример: <code>/limit Еда 10000</code>",
                 parse_mode="HTML",
             )
+
+    except asyncio.TimeoutError:
+        logger.warning(f"Limit command timeout for user {user_id}")
+        await message.answer("Запрос занял слишком много времени. Попробуйте позже.")
+
+    except ServiceUnavailableError:
+        logger.warning(f"Service unavailable for limit command from user {user_id}")
+        await message.answer("Сервис временно недоступен. Попробуйте позже.")
+
+    except QuotaExceededError:
+        logger.warning(f"Quota exceeded for limit command from user {user_id}")
+        await message.answer("Превышен лимит запросов. Подождите минуту.")
 
     except Exception as e:
         logger.error(

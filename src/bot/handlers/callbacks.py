@@ -7,6 +7,7 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
+from src.bot.decorators import require_api_client
 from src.bot.formatters import (
     format_examples_message,
     format_expense_deleted,
@@ -19,9 +20,9 @@ from src.bot.keyboards.inline import (
     get_main_menu_keyboard,
     get_stats_period_keyboard,
 )
-from src.bot.decorators import require_api_client
 from src.bot.keyboards.reply import get_categories_keyboard
 from src.bot.states import AddExpenseStates
+from src.core.exceptions import QuotaExceededError, ServiceUnavailableError
 from src.core.http_client import ServiceClient
 
 logger = logging.getLogger(__name__)
@@ -109,6 +110,27 @@ async def callback_show_stats(
             reply_markup=get_stats_period_keyboard(),
         )
 
+    except asyncio.TimeoutError:
+        logger.warning(f"Stats callback timeout for user {user_id}")
+        await callback.message.edit_text(
+            "Запрос занял слишком много времени. Попробуйте позже.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except ServiceUnavailableError:
+        logger.warning(f"Service unavailable for stats callback from user {user_id}")
+        await callback.message.edit_text(
+            "Сервис временно недоступен. Попробуйте позже.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except QuotaExceededError:
+        logger.warning(f"Quota exceeded for stats callback from user {user_id}")
+        await callback.message.edit_text(
+            "Превышен лимит запросов. Подождите минуту.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
     except Exception as e:
         logger.error(
             f"Stats callback failed for user {user_id}: {type(e).__name__}: {e}",
@@ -157,6 +179,27 @@ async def callback_show_last(
             reply_markup=get_back_to_menu_keyboard(),
         )
 
+    except asyncio.TimeoutError:
+        logger.warning(f"Last expenses callback timeout for user {user_id}")
+        await callback.message.edit_text(
+            "Запрос занял слишком много времени. Попробуйте позже.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except ServiceUnavailableError:
+        logger.warning(f"Service unavailable for last callback from user {user_id}")
+        await callback.message.edit_text(
+            "Сервис временно недоступен. Попробуйте позже.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except QuotaExceededError:
+        logger.warning(f"Quota exceeded for last callback from user {user_id}")
+        await callback.message.edit_text(
+            "Превышен лимит запросов. Подождите минуту.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
     except Exception as e:
         logger.error(
             f"Last expenses callback failed for user {user_id}: {type(e).__name__}: {e}",
@@ -199,6 +242,27 @@ async def callback_confirm_delete(
         await callback.message.edit_text(
             delete_text,
             parse_mode="HTML",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except asyncio.TimeoutError:
+        logger.warning(f"Delete callback timeout for user {user_id}")
+        await callback.message.edit_text(
+            "Запрос занял слишком много времени. Попробуйте позже.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except ServiceUnavailableError:
+        logger.warning(f"Service unavailable for delete callback from user {user_id}")
+        await callback.message.edit_text(
+            "Сервис временно недоступен. Попробуйте позже.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except QuotaExceededError:
+        logger.warning(f"Quota exceeded for delete callback from user {user_id}")
+        await callback.message.edit_text(
+            "Превышен лимит запросов. Подождите минуту.",
             reply_markup=get_back_to_menu_keyboard(),
         )
 
@@ -255,6 +319,27 @@ async def callback_delete_last(
         await callback.message.edit_text(
             delete_text,
             parse_mode="HTML",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except asyncio.TimeoutError:
+        logger.warning(f"Delete last callback timeout for user {user_id}")
+        await callback.message.edit_text(
+            "Запрос занял слишком много времени. Попробуйте позже.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except ServiceUnavailableError:
+        logger.warning(f"Service unavailable for delete last from user {user_id}")
+        await callback.message.edit_text(
+            "Сервис временно недоступен. Попробуйте позже.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except QuotaExceededError:
+        logger.warning(f"Quota exceeded for delete last from user {user_id}")
+        await callback.message.edit_text(
+            "Превышен лимит запросов. Подождите минуту.",
             reply_markup=get_back_to_menu_keyboard(),
         )
 
@@ -347,6 +432,27 @@ async def callback_stats_period(
             stats_text,
             parse_mode="HTML",
             reply_markup=get_stats_period_keyboard(),
+        )
+
+    except asyncio.TimeoutError:
+        logger.warning(f"Stats period callback timeout for user {user_id}")
+        await callback.message.edit_text(
+            "Запрос занял слишком много времени. Попробуйте позже.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except ServiceUnavailableError:
+        logger.warning(f"Service unavailable for stats period from user {user_id}")
+        await callback.message.edit_text(
+            "Сервис временно недоступен. Попробуйте позже.",
+            reply_markup=get_back_to_menu_keyboard(),
+        )
+
+    except QuotaExceededError:
+        logger.warning(f"Quota exceeded for stats period from user {user_id}")
+        await callback.message.edit_text(
+            "Превышен лимит запросов. Подождите минуту.",
+            reply_markup=get_back_to_menu_keyboard(),
         )
 
     except Exception as e:

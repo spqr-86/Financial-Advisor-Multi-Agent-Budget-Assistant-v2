@@ -11,6 +11,7 @@ from aiogram.types import Message
 from src.bot.decorators import require_api_client
 from src.bot.keyboards import get_after_add_keyboard, get_main_menu_keyboard
 from src.bot.utils import send_chunked_message, split_long_message
+from src.core.exceptions import QuotaExceededError, ServiceUnavailableError
 from src.core.http_client import ServiceClient
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,18 @@ async def handle_text(
         await message.answer(
             "Обработка запроса заняла слишком много времени. "
             "Попробуйте упростить запрос или повторите позже."
+        )
+
+    except ServiceUnavailableError:
+        logger.warning(f"Service unavailable for user {user_id}")
+        await message.answer(
+            "Сервис временно недоступен. Попробуйте через несколько минут."
+        )
+
+    except QuotaExceededError:
+        logger.warning(f"Quota exceeded for user {user_id}")
+        await message.answer(
+            "Превышен лимит запросов к AI. Подождите минуту и попробуйте снова."
         )
 
     except Exception as e:
