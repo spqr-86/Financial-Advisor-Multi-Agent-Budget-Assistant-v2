@@ -24,7 +24,9 @@ async def process_query(request: QueryRequest) -> QueryResponse:
     from src.api.app import get_mcp_client
 
     start_time = time.time()
-    query_preview = request.query[:50] + "..." if len(request.query) > 50 else request.query
+    query_preview = (
+        request.query[:50] + "..." if len(request.query) > 50 else request.query
+    )
 
     logger.info(f"Received query from user {request.user_id}: {query_preview}")
 
@@ -162,3 +164,34 @@ async def get_statistics(user_id: str, period: str = "month") -> dict:
         "user_id": user_id,
         "period": period,
     }
+
+
+@router.get("/expenses/{user_id}/{category}")
+async def get_expenses_by_category(
+    user_id: str,
+    category: str,
+    period: str = "month",  # "week" or "YYYY_MM"
+    limit: int = 10,
+    offset: int = 0,
+) -> dict:
+    """Get expenses for a specific category with pagination."""
+    from src.api.app import get_mcp_client
+
+    logger.info(
+        f"Getting expenses for user {user_id}, category: {category}, "
+        f"period: {period}, limit: {limit}, offset: {offset}"
+    )
+
+    mcp_client = get_mcp_client()
+    result = await mcp_client.post(
+        "/mcp/storage/expenses_by_category",
+        json={
+            "user_id": user_id,
+            "category": category,
+            "period": period,
+            "limit": limit,
+            "offset": offset,
+        },
+    )
+
+    return result

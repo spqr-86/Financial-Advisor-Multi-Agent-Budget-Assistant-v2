@@ -55,7 +55,9 @@ async def process_mcp_query(
 ) -> QueryResponse:
     """Process user query through AI agent system."""
     start_time = time.time()
-    query_preview = request.query[:50] + "..." if len(request.query) > 50 else request.query
+    query_preview = (
+        request.query[:50] + "..." if len(request.query) > 50 else request.query
+    )
 
     logger.info(f"MCP processing query from user {request.user_id}: {query_preview}")
 
@@ -90,7 +92,11 @@ async def process_mcp_query(
 
         # Special handling for quota errors
         error_str = str(e).lower()
-        if "429" in error_str or "quota" in error_str or "resource_exhausted" in error_str:
+        if (
+            "429" in error_str
+            or "quota" in error_str
+            or "resource_exhausted" in error_str
+        ):
             logger.error(
                 f"🚨 GEMINI API QUOTA EXCEEDED for user {request.user_id} after {elapsed:.2f}s! "
                 f"Check quota at: https://ai.google.dev/gemini-api/docs/rate-limits",
@@ -114,7 +120,9 @@ async def add_expense(
     storage: StorageInterface = Depends(get_storage),
 ) -> dict:
     """Add a new expense."""
-    logger.info(f"Adding expense for user {request.user_id}: {request.category} - {request.amount}")
+    logger.info(
+        f"Adding expense for user {request.user_id}: {request.category} - {request.amount}"
+    )
 
     result = await storage.add_expense(
         user_id=request.user_id,
@@ -152,7 +160,9 @@ async def get_statistics(
     storage: StorageInterface = Depends(get_storage),
 ) -> dict:
     """Get expense statistics."""
-    logger.info(f"Getting statistics for user {request.user_id}, period: {request.period}")
+    logger.info(
+        f"Getting statistics for user {request.user_id}, period: {request.period}"
+    )
 
     result = await storage.get_statistics(
         user_id=request.user_id,
@@ -175,6 +185,88 @@ async def delete_last_expense(
     )
 
     return result
+
+
+@router.post("/storage/expenses_by_category")
+async def get_expenses_by_category(
+    request: dict,
+    storage: StorageInterface = Depends(get_storage),
+) -> dict:
+    """Get expenses filtered by category with pagination."""
+    user_id = request.get("user_id", "default")
+    category = request.get("category")
+    period = request.get("period", "month")
+    limit = request.get("limit", 10)
+    offset = request.get("offset", 0)
+
+    # Parse period to date range
+    if period == "week":
+        from datetime import datetime, timedelta
+
+        now = datetime.now()
+        days_since_monday = now.weekday()
+        start_date = (now - timedelta(days=days_since_monday)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        end_date = None
+    elif "_" in period:  # YYYY_MM format
+        year, month = period.split("_")
+        from datetime import datetime
+
+        start_date = datetime(int(year), int(month), 1)
+        if int(month) == 12:
+            end_date = datetime(int(year) + 1, 1, 1)
+        else:
+            end_date = datetime(int(year), int(month) + 1, 1)
+    else:
+        start_date = None
+        end_date = None
+
+    # Get all expenses for category (storage handles filtering)
+    result = await storage.get_expenses(
+        user_id=user_id,
+        category=category,
+        start_date=start_date,
+        end_date=end_date,
+        limit=1000,  # Get all to count total
+    )
+
+    all_expenses = result.get("expenses", [])
+    total_count = len(all_expenses)
+
+    # Apply pagination
+    paginated = all_expenses[offset : offset + limit]
+
+    # Calculate total amount
+    total = sum(
+        float(
+            str(e.get("Сумма", 0)).replace(",", ".").replace("₽", "").replace(" ", "")
+        )
+        for e in all_expenses
+    )
+
+    # Transform to simpler format
+    expenses = [
+        {
+            "date": e.get("Дата", ""),
+            "description": e.get("Расшифровка", ""),
+            "amount": float(
+                str(e.get("Сумма", 0))
+                .replace(",", ".")
+                .replace("₽", "")
+                .replace(" ", "")
+            ),
+        }
+        for e in paginated
+    ]
+
+    return {
+        "expenses": expenses,
+        "total": total,
+        "count": len(expenses),
+        "total_count": total_count,
+        "has_more": offset + limit < total_count,
+    }
 
 
 @router.get("/storage/health")
