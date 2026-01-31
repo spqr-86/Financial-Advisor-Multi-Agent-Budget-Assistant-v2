@@ -2,7 +2,6 @@
 
 import logging
 import os
-from typing import Any
 
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini

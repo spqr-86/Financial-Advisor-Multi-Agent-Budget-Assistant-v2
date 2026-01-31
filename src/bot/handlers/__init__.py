@@ -10,7 +10,7 @@ from aiogram.types import Message
 
 from src.bot.decorators import require_api_client
 from src.bot.keyboards import get_after_add_keyboard, get_main_menu_keyboard
-from src.bot.utils import send_chunked_message, split_long_message
+from src.bot.utils import send_chunked_message
 from src.core.exceptions import QuotaExceededError, ServiceUnavailableError
 from src.core.http_client import ServiceClient
 

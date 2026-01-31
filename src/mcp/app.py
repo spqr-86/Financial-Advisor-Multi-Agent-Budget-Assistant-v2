@@ -10,10 +10,10 @@ from src.core.exceptions import BudgetException, budget_exception_handler
 from src.core.schemas import HealthResponse
 from src.mcp.config import settings
 from src.mcp.routes import router
+from src.mcp.server.app import mcp
 
 # MCP Server imports
 from src.mcp.server.config import MCPServerSettings
-from src.mcp.server.app import mcp
 
 logging.basicConfig(
     level=settings.log_level,
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Shutting down MCP Service gracefully...")
 
     # Close any open resources
-    from src.mcp.routes import _storage, _agent
+    from src.mcp.routes import _agent, _storage
 
     if _storage:
         logger.info("Closing storage connections...")
@@ -77,7 +77,6 @@ if mcp_settings.mcp_transport in ("sse", "both"):
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     """Health check endpoint."""
-    # TODO: Check agent system health in Iteration 6
     return HealthResponse(
         status="healthy",
         service="mcp",
