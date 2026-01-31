@@ -1,11 +1,27 @@
 """Bot middlewares."""
 
+import uuid
 from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 
 from src.core.http_client import ServiceClient
+
+
+class RequestIdMiddleware(BaseMiddleware):
+    """Add unique request ID for tracing across services."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        # Generate short unique request ID (8 chars)
+        request_id = str(uuid.uuid4())[:8]
+        data["request_id"] = request_id
+        return await handler(event, data)
 
 
 class APIClientMiddleware(BaseMiddleware):

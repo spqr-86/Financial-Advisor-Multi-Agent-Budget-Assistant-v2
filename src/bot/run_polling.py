@@ -10,7 +10,7 @@ from aiogram.enums import ParseMode
 from src.bot.config import settings
 from src.bot.handlers import callbacks, commands, structured
 from src.bot.handlers import router as main_router
-from src.bot.middlewares import APIClientMiddleware
+from src.bot.middlewares import APIClientMiddleware, RequestIdMiddleware
 from src.core.constants import MAX_RETRIES, REQUEST_TIMEOUT
 from src.core.http_client import ServiceClient
 
@@ -39,6 +39,10 @@ async def main():
     dp.include_router(commands.router)
     dp.include_router(callbacks.router)
     dp.include_router(main_router)
+
+    # Setup middlewares (order matters: RequestId first for tracing)
+    dp.message.middleware(RequestIdMiddleware())
+    dp.callback_query.middleware(RequestIdMiddleware())
 
     # Setup API client middleware
     api_client = ServiceClient(

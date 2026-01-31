@@ -53,12 +53,14 @@ async def cmd_start(message: Message) -> None:
 async def handle_text(
     message: Message,
     api_client: ServiceClient | None = None,
+    request_id: str | None = None,
 ) -> None:
     """Handle all text messages."""
     if not message.from_user or not message.text:
         return
 
     user_id = str(message.from_user.id)
+    req_id = request_id or "no-id"
     query_preview = (
         message.text[:50] + "..." if len(message.text) > 50 else message.text
     )
@@ -66,7 +68,7 @@ async def handle_text(
     # Show typing indicator
     await message.bot.send_chat_action(message.chat.id, "typing")
 
-    logger.info(f"Processing query from user {user_id}: {query_preview}")
+    logger.info(f"[{req_id}] Processing query from user {user_id}: {query_preview}")
 
     try:
         result = await api_client.post(
@@ -75,7 +77,7 @@ async def handle_text(
         )
         response = result.get("response", "Нет ответа")
 
-        logger.info(f"Response for user {user_id}: {len(response)} chars")
+        logger.info(f"[{req_id}] Response for user {user_id}: {len(response)} chars")
 
         # Detect if expense was added
         show_keyboard = any(
@@ -96,27 +98,27 @@ async def handle_text(
             await send_chunked_message(message, response, keyboard)
 
     except asyncio.TimeoutError:
-        logger.warning(f"Request timeout for user {user_id}: {query_preview}")
+        logger.warning(f"[{req_id}] Request timeout for user {user_id}: {query_preview}")
         await message.answer(
             "Обработка запроса заняла слишком много времени. "
             "Попробуйте упростить запрос или повторите позже."
         )
 
     except ServiceUnavailableError:
-        logger.warning(f"Service unavailable for user {user_id}")
+        logger.warning(f"[{req_id}] Service unavailable for user {user_id}")
         await message.answer(
             "Сервис временно недоступен. Попробуйте через несколько минут."
         )
 
     except QuotaExceededError:
-        logger.warning(f"Quota exceeded for user {user_id}")
+        logger.warning(f"[{req_id}] Quota exceeded for user {user_id}")
         await message.answer(
             "Превышен лимит запросов к AI. Подождите минуту и попробуйте снова."
         )
 
     except Exception as e:
         logger.error(
-            f"API request failed for user {user_id}: {type(e).__name__}: {e}",
+            f"[{req_id}] API request failed for user {user_id}: {type(e).__name__}: {e}",
             exc_info=True,
         )
         await message.answer("Произошла ошибка. Попробуйте позже.")
