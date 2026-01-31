@@ -109,17 +109,16 @@ def format_statistics(
     msg = f"📊 <b>Статистика за {period}</b>\n\n"
 
     # Sort by amount descending
-    sorted_categories = sorted(
-        categories.items(), key=lambda x: x[1], reverse=True
-    )
+    sorted_categories = sorted(categories.items(), key=lambda x: x[1], reverse=True)
 
-    # Use limits for progress bar if available (monthly stats)
-    use_limits = limits and period == "месяц"
+    # Only show progress bars for monthly stats with limits
+    is_week = period == "неделю"
 
     for category, amount in sorted_categories:
         emoji = get_category_emoji(category)
 
-        if use_limits and category in limits:
+        if not is_week and limits and category in limits:
+            # Month with limit - show progress bar
             limit = limits[category]
             percentage = (amount / limit) * 100 if limit > 0 else 0
             filled = min(int(percentage / 10), 10)
@@ -130,14 +129,8 @@ def format_statistics(
                 f"{bar} {percentage:.0f}%{warning}\n"
             )
         else:
-            # No limit - show percentage of total
-            percentage = (amount / total) * 100 if total > 0 else 0
-            filled = int(percentage / 10)
-            bar = "█" * filled + "░" * (10 - filled)
-            msg += (
-                f"{emoji} <b>{category}</b>: {amount:,.0f}₽ "
-                f"{bar} {percentage:.0f}%\n"
-            )
+            # Week or no limit - just amount
+            msg += f"{emoji} <b>{category}</b>: {amount:,.0f}₽\n"
 
     msg += f"\n💰 <b>Итого: {total:,.0f}₽</b>"
 
