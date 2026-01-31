@@ -2,35 +2,19 @@
 
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
+from src.core.categories import KEYBOARD_CATEGORIES, get_category_with_emoji
+
 
 def get_categories_keyboard() -> ReplyKeyboardMarkup:
     """Get keyboard for selecting expense category."""
+    keyboard = [
+        [KeyboardButton(text=get_category_with_emoji(cat)) for cat in row]
+        for row in KEYBOARD_CATEGORIES
+    ]
+    keyboard.append([KeyboardButton(text="❌ Отмена")])
+
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(text="🛒 Продукты"),
-                KeyboardButton(text="🚗 Транспорт"),
-                KeyboardButton(text="🍔 Еда"),
-            ],
-            [
-                KeyboardButton(text="🏠 Аренда"),
-                KeyboardButton(text="💡 Коммуналка"),
-                KeyboardButton(text="📱 Связь"),
-            ],
-            [
-                KeyboardButton(text="👕 Одежда"),
-                KeyboardButton(text="💊 Здоровье, красота, гигиена"),
-                KeyboardButton(text="🍽️ Рестораны"),
-            ],
-            [
-                KeyboardButton(text="🎁 Подарки"),
-                KeyboardButton(text="🎭 Кино, театры, музеи"),
-                KeyboardButton(text="💼 Прочее"),
-            ],
-            [
-                KeyboardButton(text="❌ Отмена"),
-            ],
-        ],
+        keyboard=keyboard,
         resize_keyboard=True,
         one_time_keyboard=True,
     )

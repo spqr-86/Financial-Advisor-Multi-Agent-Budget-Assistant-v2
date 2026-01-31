@@ -3,46 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-# Category emoji mapping
-CATEGORY_EMOJI = {
-    "Аренда": "🏠",
-    "Детский сад": "👶",
-    "Продукты": "🛒",
-    "Транспорт": "🚗",
-    "Еда": "🍔",
-    "Прочее": "💼",
-    "Алкоголь": "🍷",
-    "Здоровье, красота, гигиена": "💊",
-    "Спорт": "⚽",
-    "Творчество, книги, обучение": "📚",
-    "WB": "🛍️",
-    "Яндекс.Маркет": "📦",
-    "Подписки": "📺",
-    "Коммуналка": "💡",
-    "Кино, театры, музеи": "🎭",
-    "Одежда": "👕",
-    "Подарки": "🎁",
-    "Связь": "📱",
-    "Рестораны": "🍽️",
-    "Кредит": "🏦",
-    "Кредитка": "💳",
-}
-
-
-def get_category_emoji(category: str) -> str:
-    """Get emoji for a category, with fallback."""
-    # Try exact match first
-    if category in CATEGORY_EMOJI:
-        return CATEGORY_EMOJI[category]
-
-    # Try case-insensitive match
-    category_lower = category.lower()
-    for cat_name, emoji in CATEGORY_EMOJI.items():
-        if cat_name.lower() == category_lower:
-            return emoji
-
-    # Default emoji
-    return "💼"
+from src.core.categories import CATEGORY_EMOJI, get_category_emoji
 
 
 def format_expense_added(

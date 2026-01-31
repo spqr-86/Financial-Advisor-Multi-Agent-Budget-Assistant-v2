@@ -16,28 +16,12 @@ from src.bot.keyboards import (
     remove_keyboard,
 )
 from src.bot.states import AddExpenseStates
+from src.core.categories import parse_category_with_emoji
 from src.core.http_client import ServiceClient
 
 logger = logging.getLogger(__name__)
 
 router = Router(name="structured")
-
-
-# Category name mapping (with emoji removed)
-CATEGORY_MAP = {
-    "🛒 Продукты": "Продукты",
-    "🚗 Транспорт": "Транспорт",
-    "🍔 Еда": "Еда",
-    "🏠 Аренда": "Аренда",
-    "💡 Коммуналка": "Коммуналка",
-    "📱 Связь": "Связь",
-    "👕 Одежда": "Одежда",
-    "💊 Здоровье, красота, гигиена": "Здоровье, красота, гигиена",
-    "🍽️ Рестораны": "Рестораны",
-    "🎁 Подарки": "Подарки",
-    "🎭 Кино, театры, музеи": "Кино, театры, музеи",
-    "💼 Прочее": "Прочее",
-}
 
 
 @router.message(Command("add"))
@@ -80,7 +64,7 @@ async def add_category_selected(message: Message, state: FSMContext) -> None:
         return
 
     # Map category with emoji to clean category name
-    category = CATEGORY_MAP.get(message.text, message.text)
+    category = parse_category_with_emoji(message.text)
 
     # Save category to state
     await state.update_data(category=category)

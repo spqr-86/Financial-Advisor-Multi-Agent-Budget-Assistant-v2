@@ -10,6 +10,7 @@ from google.adk.runners import InMemoryRunner
 from google.adk.tools import AgentTool
 from google.genai import types
 
+from src.core.categories import format_categories_for_prompt, get_categories_list
 from src.mcp.agents.tools.sheets import (
     add_expense_tool,
     delete_last_expense_tool,
@@ -17,6 +18,10 @@ from src.mcp.agents.tools.sheets import (
     get_statistics_tool,
 )
 from src.mcp.config import settings
+
+# Generate categories text for prompts
+_categories_list = "\n".join(f"- {cat}" for cat in get_categories_list())
+_categories_with_emoji = format_categories_for_prompt()
 
 logger = logging.getLogger(__name__)
 
@@ -39,34 +44,14 @@ registrar_agent = LlmAgent(
         model=settings.gemini_model,  # Configurable via GEMINI_MODEL env var
         retry_options=retry_config,
     ),
-    instruction="""Ты - агент-регистратор для семейного бюджета.
+    instruction=f"""Ты - агент-регистратор для семейного бюджета.
 
 Твои возможности:
 1. **add_expense_tool** - добавлять расходы в таблицу
 2. **delete_last_expense_tool** - удалить последний расход (если пользователь ошибся)
 
 Основные категории расходов:
-- Аренда
-- Детский сад
-- Продукты
-- Транспорт
-- Еда (кафе, фастфуд, не дома но не ресторан)
-- Прочее
-- Алкоголь
-- Здоровье, красота, гигиена
-- Спорт
-- Творчество, книги, обучение
-- WB
-- Яндекс.Маркет
-- Подписки (Netflix, Spotify и т.д.)
-- Коммуналка
-- Кино, театры, музеи
-- Одежда
-- Подарки
-- Связь (телефон, интернет)
-- Рестораны
-- Кредит
-- Кредитка
+{_categories_list}
 
 КРИТИЧЕСКИ ВАЖНО:
 Когда пользователь описывает покупку (например "купил хлеб 50 рублей"):
@@ -94,7 +79,7 @@ analyst_agent = LlmAgent(
         model=settings.gemini_model,  # Configurable via GEMINI_MODEL env var
         retry_options=retry_config,
     ),
-    instruction="""Ты - агент-аналитик для семейного бюджета.
+    instruction=f"""Ты - агент-аналитик для семейного бюджета.
 
 Твои возможности:
 1. **get_expenses_tool** - показывать последние расходы
@@ -106,28 +91,8 @@ analyst_agent = LlmAgent(
 3. Формат для каждого расхода:
    <дата> | <emoji категории> <категория> | <описание> - <сумма>₽
 
-   Примеры emoji:
-   🏠 Аренда
-   👶 Детский сад
-   🛒 Продукты
-   🚗 Транспорт
-   🍔 Еда (кафе, фастфуд)
-   💼 Прочее
-   🍷 Алкоголь
-   💊 Здоровье, красота, гигиена
-   ⚽ Спорт
-   📚 Творчество, книги, обучение
-   🛍️ WB
-   📦 Яндекс.Маркет
-   📺 Подписки
-   💡 Коммуналка
-   🎭 Кино, театры, музеи
-   👕 Одежда
-   🎁 Подарки
-   📱 Связь
-   🍽️ Рестораны
-   🏦 Кредит
-   💳 Кредитка
+   Категории с emoji:
+{_categories_with_emoji}
 
 Когда пользователь просит статистику:
 1. Используй get_statistics_tool с параметрами: period, user_id="default"

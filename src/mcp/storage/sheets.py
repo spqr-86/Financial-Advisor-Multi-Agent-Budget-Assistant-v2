@@ -9,6 +9,7 @@ from typing import Any
 import gspread
 from google.oauth2.service_account import Credentials
 
+from src.core.categories import VALID_CATEGORIES
 from src.mcp.config import settings
 from src.mcp.storage.interface import StorageInterface
 
@@ -439,30 +440,6 @@ class GoogleSheetsStorage(StorageInterface):
         """Add multiple expenses using batch API."""
         try:
             worksheet = await self._get_worksheet()
-
-            VALID_CATEGORIES = {
-                "Аренда",
-                "Детский сад",
-                "Продукты",
-                "Транспорт",
-                "Еда",
-                "Прочее",
-                "Алкоголь",
-                "Здоровье, красота, гигиена",
-                "Спорт",
-                "Творчество, книги, обучение",
-                "WB",
-                "Яндекс.Маркет",
-                "Подписки",
-                "Коммуналка",
-                "Кино, театры, музеи",
-                "Одежда",
-                "Подарки",
-                "Связь",
-                "Рестораны",
-                "Кредит",
-                "Кредитка",
-            }
 
             rows_to_add = []
             errors = []
