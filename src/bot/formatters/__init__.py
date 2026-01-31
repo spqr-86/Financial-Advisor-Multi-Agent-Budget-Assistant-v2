@@ -2,6 +2,7 @@
 
 from src.bot.formatters.messages import (
     CATEGORY_EMOJI,
+    format_category_detail,
     format_examples_message,
     format_expense_added,
     format_expense_deleted,
@@ -17,6 +18,7 @@ from src.bot.formatters.messages import (
 
 __all__ = [
     "CATEGORY_EMOJI",
+    "format_category_detail",
     "format_examples_message",
     "format_expense_added",
     "format_expense_deleted",

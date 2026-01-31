@@ -3,6 +3,8 @@
 import asyncio
 import logging
 
+from datetime import datetime
+
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -10,6 +12,7 @@ from aiogram.types import Message
 from src.bot.decorators import require_api_client
 from src.bot.formatters import (
     CATEGORY_EMOJI,
+    format_category_detail,
     format_examples_message,
     format_expenses_list,
     format_help_message,
@@ -20,9 +23,12 @@ from src.bot.formatters import (
 )
 from src.bot.keyboards.inline import (
     get_back_to_menu_keyboard,
+    get_back_to_stats_keyboard,
+    get_category_detail_keyboard,
     get_confirm_delete_keyboard,
     get_stats_period_keyboard,
 )
+from src.core.categories import VALID_CATEGORIES
 from src.core.exceptions import QuotaExceededError, ServiceUnavailableError
 from src.core.http_client import ServiceClient
 
@@ -30,19 +36,61 @@ logger = logging.getLogger(__name__)
 
 router = Router(name="commands")
 
+MONTH_NAMES_LOWER = {
+    "январь": 1,
+    "февраль": 2,
+    "март": 3,
+    "апрель": 4,
+    "май": 5,
+    "июнь": 6,
+    "июль": 7,
+    "август": 8,
+    "сентябрь": 9,
+    "октябрь": 10,
+    "ноябрь": 11,
+    "декабрь": 12,
+}
 
-@router.message(Command("help"))
-async def cmd_help(message: Message) -> None:
-    """Handle /help command."""
-    if not message.from_user:
-        return
 
-    help_text = format_help_message()
-    await message.answer(
-        help_text,
-        parse_mode="HTML",
-        reply_markup=get_back_to_menu_keyboard(),
-    )
+def parse_stats_args(args: list[str]) -> tuple[str | None, str | None]:
+    """Parse /stats command arguments.
+
+    Returns:
+        (category, period) tuple where:
+        - category: category name or None
+        - period: "week" or "YYYY_MM" or None
+    """
+    if not args:
+        return None, None
+
+    category = None
+    period = None
+
+    for arg in args:
+        arg_lower = arg.lower()
+
+        # Check if it's "week"
+        if arg_lower == "неделя":
+            period = "week"
+            continue
+
+        # Check if it's a month name
+        if arg_lower in MONTH_NAMES_LOWER:
+            month = MONTH_NAMES_LOWER[arg_lower]
+            year = datetime.now().year
+            # If month is in future, assume previous year
+            if month > datetime.now().month:
+                year -= 1
+            period = f"{year}_{month:02d}"
+            continue
+
+        # Check if it's a category (case-insensitive)
+        for valid_cat in VALID_CATEGORIES:
+            if arg_lower == valid_cat.lower():
+                category = valid_cat
+                break
+
+    return category, period
 
 
 @router.message(Command("stats"))
@@ -51,61 +99,94 @@ async def cmd_stats(
     message: Message,
     api_client: ServiceClient | None = None,
 ) -> None:
-    """Handle /stats command - show expense statistics."""
+    """Handle /stats command with optional arguments."""
     if not message.from_user:
         return
 
     user_id = str(message.from_user.id)
+    args = message.text.split()[1:]  # Remove "/stats"
+
+    category, period = parse_stats_args(args)
+
     await message.bot.send_chat_action(message.chat.id, "typing")
 
     try:
-        # Request statistics and limits in parallel
-        stats_result, limits_result = await asyncio.gather(
-            api_client.post(
-                "/api/query",
-                json={
-                    "query": "покажи статистику за месяц",
-                    "user_id": user_id,
-                },
-            ),
-            api_client.get(f"/api/limits/{user_id}"),
-        )
-        limits = limits_result.get("limits", {})
-
-        # Format with limits for monthly stats
-        if "statistics" in stats_result:
-            stats_text = format_statistics(
-                stats_result["statistics"],
-                period="месяц",
-                limits=limits if limits else None,
+        if category:
+            # Show category detail
+            period = period or f"{datetime.now().year}_{datetime.now().month:02d}"
+            result = await api_client.get(
+                f"/api/expenses/{user_id}/{category}",
+                params={"period": period, "limit": 10, "offset": 0},
             )
-        else:
-            stats_text = stats_result.get("response", "Нет данных")
 
-        await message.answer(
-            stats_text,
-            parse_mode="HTML",
-            reply_markup=get_stats_period_keyboard(),
-        )
+            period_display = _format_period_display(period)
+            text = format_category_detail(
+                category=category,
+                period=period_display,
+                expenses=result.get("expenses", []),
+                total=result.get("total", 0),
+                shown=result.get("count", 0),
+                total_count=result.get("total_count", 0),
+            )
+            keyboard = get_category_detail_keyboard(
+                category=category,
+                period=period,
+                offset=0,
+                has_more=result.get("has_more", False),
+            )
+        elif period:
+            # Show stats for specific period
+            if period == "week":
+                result = await api_client.get(f"/api/statistics/{user_id}/week")
+                period_display = "неделю"
+                limits = None
+            else:
+                # Request statistics and limits in parallel
+                result_raw, limits_result = await asyncio.gather(
+                    api_client.get(
+                        f"/api/statistics/{user_id}/month",
+                        params={"period": period},
+                    ),
+                    api_client.get(f"/api/limits/{user_id}"),
+                )
+                result = result_raw.get("statistics", {})
+                limits = limits_result.get("limits", {})
+                period_display = _format_period_display(period)
+
+            text = format_statistics(
+                result,
+                period=period_display,
+                limits=limits,
+            )
+            keyboard = get_back_to_stats_keyboard()
+        else:
+            # No args - show period selection
+            text = "📊 <b>Статистика</b>\n\nВыберите период:"
+            keyboard = get_stats_period_keyboard()
+
+        await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
     except asyncio.TimeoutError:
-        logger.warning(f"Stats request timeout for user {user_id}")
         await message.answer("Запрос занял слишком много времени. Попробуйте позже.")
-
     except ServiceUnavailableError:
-        logger.warning(f"Service unavailable for stats request from user {user_id}")
         await message.answer("Сервис временно недоступен. Попробуйте позже.")
-
     except QuotaExceededError:
-        logger.warning(f"Quota exceeded for stats request from user {user_id}")
         await message.answer("Превышен лимит запросов. Подождите минуту.")
-
     except Exception as e:
-        logger.error(
-            f"Stats request failed for user {user_id}: {type(e).__name__}: {e}",
-            exc_info=True,
-        )
+        logger.error(f"Stats request failed: {e}", exc_info=True)
         await message.answer("Не удалось получить статистику. Попробуйте позже.")
+
+
+def _format_period_display(period: str) -> str:
+    """Convert period code to display string."""
+    if period == "week":
+        return "неделю"
+    if "_" in period:
+        year, month = period.split("_")
+        from src.bot.keyboards.inline import MONTH_NAMES
+
+        return f"{MONTH_NAMES[int(month) - 1]} {year}"
+    return period
 
 
 @router.message(Command("last"))
@@ -286,10 +367,7 @@ async def cmd_limit(
 
     except Exception as e:
         logger.error(
-            f"Limit command failed for user {user_id}: "
-            f"{type(e).__name__}: {e}",
+            f"Limit command failed for user {user_id}: {type(e).__name__}: {e}",
             exc_info=True,
         )
-        await message.answer(
-            "Не удалось выполнить команду. Попробуйте позже."
-        )
+        await message.answer("Не удалось выполнить команду. Попробуйте позже.")

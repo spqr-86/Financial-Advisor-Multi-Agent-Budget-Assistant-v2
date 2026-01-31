@@ -153,3 +153,16 @@ def get_category_detail_keyboard(
     )
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def get_back_to_stats_keyboard() -> InlineKeyboardMarkup:
+    """Get keyboard with back to period selection."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔙 Выбрать период", callback_data="stats_select_period"
+                )
+            ],
+        ]
+    )
