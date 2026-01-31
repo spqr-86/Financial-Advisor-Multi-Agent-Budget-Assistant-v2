@@ -308,7 +308,11 @@ class GoogleSheetsStorage(StorageInterface):
             if period == "day":
                 start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
             elif period == "week":
-                start_date = now - timedelta(days=7)
+                # Calendar week: from Monday of current week
+                days_since_monday = now.weekday()  # Monday=0, Sunday=6
+                start_date = (now - timedelta(days=days_since_monday)).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
             elif period == "month":
                 # Calendar month: from 1st day of current month
                 start_date = now.replace(
@@ -343,10 +347,13 @@ class GoogleSheetsStorage(StorageInterface):
                 try:
                     amount_str = row[3] if len(row) > 3 else "0"
                     # Replace comma with dot and remove currency symbols
+                    # Note: Google Sheets uses non-breaking space (\u00a0) as
+                    # thousands separator, not regular space
                     amount_str = (
                         amount_str.replace(",", ".")
                         .replace("₽", "")
                         .replace(" ", "")
+                        .replace("\u00a0", "")  # non-breaking space
                         .strip()
                     )
                     amount = float(amount_str) if amount_str else 0.0
@@ -564,7 +571,12 @@ class GoogleSheetsStorage(StorageInterface):
                 if len(row) >= 2 and row[0] and row[1]:
                     category = row[0]
                     try:
-                        amount = float(row[1].replace(",", ".").replace(" ", ""))
+                        amount = float(
+                            row[1]
+                            .replace(",", ".")
+                            .replace(" ", "")
+                            .replace("\u00a0", "")  # non-breaking space
+                        )
                         if amount > 0:
                             limits[category] = amount
                     except (ValueError, TypeError):
