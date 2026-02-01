@@ -65,7 +65,7 @@ app.include_router(router)
 # FastMCP 2.x: use http_app() with transport="sse" and mount as ASGI app
 if mcp_settings.mcp_transport in ("sse", "both"):
     logger.info(
-        f"MCP SSE transport enabled, mounting at /mcp"
+        "MCP SSE transport enabled, mounting at /mcp"
     )
     # Create MCP ASGI app with SSE transport
     mcp_asgi_app = mcp.http_app(path="/", transport="sse")

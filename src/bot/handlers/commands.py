@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-
 from datetime import datetime
 
 from aiogram import Router
@@ -15,7 +14,6 @@ from src.bot.formatters import (
     format_category_detail,
     format_examples_message,
     format_expenses_list,
-    format_help_message,
     format_limit_deleted,
     format_limit_set,
     format_limits,
