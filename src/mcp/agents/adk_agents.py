@@ -94,6 +94,7 @@ analyst_agent = LlmAgent(
         retry_options=retry_config,
     ),
     instruction=f"""Ты - агент-аналитик для семейного бюджета.
+Текущий год: 2026, текущий месяц: февраль.
 
 Твои возможности:
 1. **get_expenses_tool** - показывать последние расходы
