@@ -457,10 +457,7 @@ async def callback_stats_specific_month(
     try:
         # Fetch stats and limits
         result_raw, limits_result = await asyncio.gather(
-            api_client.get(
-                f"/api/statistics/{user_id}/month",
-                params={"period": period},
-            ),
+            api_client.get(f"/api/statistics/{user_id}/{period}"),
             api_client.get(f"/api/limits/{user_id}"),
         )
         result = result_raw.get("statistics", {})
