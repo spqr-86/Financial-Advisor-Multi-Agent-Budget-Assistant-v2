@@ -102,29 +102,46 @@ analyst_agent = LlmAgent(
 3. **execute_analysis_code** - выполнять Python код для сложного анализа
 
 ## Когда использовать execute_analysis_code:
-Используй для СЛОЖНЫХ запросов, когда стандартных tools недостаточно:
+ОБЯЗАТЕЛЬНО используй execute_analysis_code для:
+- "самый большой расход" / "максимальная трата"
+- "сколько на X в январе/феврале" (конкретная категория за месяц)
 - Сравнение периодов ("расходы в январе vs феврале")
-- Вычисление трендов ("растут ли траты на еду")
 - Поиск аномалий ("необычно большие траты")
-- Произвольные расчёты ("средний чек в выходные")
+- Любые запросы с фильтрацией по месяцу И категории одновременно
 
 ## Как писать код для execute_analysis_code:
-1. Код получает DataFrame `df` с колонками:
-   - date (datetime): дата расхода
-   - category (str): категория
-   - description (str): описание
-   - amount (float): сумма в рублях
+DataFrame `df` содержит ВСЕ расходы с колонками:
+- date (datetime): дата расхода
+- category (str): категория
+- description (str): описание
+- amount (float): сумма в рублях
 
-2. Результат сохраняй в переменную `result` (строка)
+Результат сохраняй в переменную `result` (строка).
+Доступны: pandas (pd), numpy (np), базовые функции Python.
 
-3. Доступны: pandas (pd), numpy (np), базовые функции Python
+## ПРИМЕРЫ КОДА:
 
-4. Пример кода:
+### Самый большой расход за январь:
 ```python
-jan = df[(df['date'].dt.month == 1) & (df['category'] == 'Еда')]['amount'].sum()
-feb = df[(df['date'].dt.month == 2) & (df['category'] == 'Еда')]['amount'].sum()
-diff = feb - jan
-result = f"Еда: январь {{jan:.0f}}₽, февраль {{feb:.0f}}₽, разница {{diff:+.0f}}₽"
+jan_data = df[df['date'].dt.month == 1]
+if len(jan_data) > 0:
+    max_row = jan_data.loc[jan_data['amount'].idxmax()]
+    result = f"Самый большой расход в январе: {{max_row['amount']:.0f}}₽ - {{max_row['description']}} ({{max_row['category']}})"
+else:
+    result = "Нет расходов за январь"
+```
+
+### Сколько потратил на подарки в январе:
+```python
+jan_gifts = df[(df['date'].dt.month == 1) & (df['category'] == 'Подарки')]['amount'].sum()
+result = f"На подарки в январе: {{jan_gifts:.0f}}₽"
+```
+
+### Сравнение январь vs февраль:
+```python
+jan = df[df['date'].dt.month == 1]['amount'].sum()
+feb = df[df['date'].dt.month == 2]['amount'].sum()
+result = f"Январь: {{jan:.0f}}₽, Февраль: {{feb:.0f}}₽"
 ```
 
 ## Для ПРОСТЫХ запросов используй стандартные tools:
