@@ -39,14 +39,13 @@ SAFE_BUILTINS = {
 }
 
 
-def execute_in_sandbox(code: str, df: pd.DataFrame, timeout: int = 10) -> str:
+def execute_in_sandbox(code: str, df: pd.DataFrame) -> str:
     """
     Execute Python code in a restricted sandbox.
 
     Args:
         code: Python code to execute
         df: DataFrame with expenses data
-        timeout: Max execution time in seconds (enforced by async wrapper)
 
     Returns:
         Result string from code execution or error message
@@ -67,21 +66,14 @@ def execute_in_sandbox(code: str, df: pd.DataFrame, timeout: int = 10) -> str:
         "df": df,
     }
 
-    # Empty locals for code execution
-    safe_locals: dict[str, Any] = {}
-
     try:
         # Execute code in restricted environment
+        safe_locals: dict[str, Any] = {}
         exec(code, safe_globals, safe_locals)
 
         # Extract result
         result = safe_locals.get("result", "Код не вернул результат")
         return str(result)
-
-    except NameError as e:
-        # Catch attempts to use blocked builtins or imports
-        logger.warning(f"Code execution blocked unsafe operation: {e}")
-        return f"Ошибка выполнения: {str(e)}"
 
     except Exception as e:
         logger.warning(f"Code execution error: {e}")
@@ -150,8 +142,8 @@ async def execute_analysis_code(code: str, user_id: str = "default") -> str:
             return "Нет данных для анализа"
 
         # Execute with timeout in thread pool
-        loop = asyncio.get_event_loop()
-        with concurrent.futures.ThreadPoolExecutor() as pool:
+        loop = asyncio.get_running_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             try:
                 result = await asyncio.wait_for(
                     loop.run_in_executor(pool, execute_in_sandbox, code, df),
