@@ -25,36 +25,12 @@ class ServiceUnavailableError(BudgetException):
     code = "SERVICE_UNAVAILABLE"
 
 
-class ValidationError(BudgetException):
-    """Raised for validation errors."""
-
-    status_code = 400
-    detail = "Validation error"
-    code = "VALIDATION_ERROR"
-
-
-class NotFoundError(BudgetException):
-    """Raised when a resource is not found."""
-
-    status_code = 404
-    detail = "Resource not found"
-    code = "NOT_FOUND"
-
-
 class RateLimitError(BudgetException):
     """Raised when rate limit is exceeded."""
 
     status_code = 429
     detail = "Too many requests"
     code = "RATE_LIMIT_EXCEEDED"
-
-
-class AgentError(BudgetException):
-    """Raised when AI agent fails."""
-
-    status_code = 500
-    detail = "Agent processing failed"
-    code = "AGENT_ERROR"
 
 
 class QuotaExceededError(BudgetException):

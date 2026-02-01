@@ -44,4 +44,3 @@ class TTLCache:
 
 # Global cache instances
 limits_cache = TTLCache(ttl_seconds=60)  # Limits rarely change
-stats_cache = TTLCache(ttl_seconds=30)   # Stats can be cached briefly

@@ -266,7 +266,7 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 
 ### Exception Handling (`src/core/exceptions.py`)
 - Custom exception hierarchy extending `BudgetException`
-- Exceptions: `ServiceUnavailableError` (503), `ValidationError` (400), `NotFoundError` (404), `RateLimitError` (429), `AgentError` (500)
+- Exceptions: `ServiceUnavailableError` (503), `RateLimitError` (429), `QuotaExceededError` (429)
 - Automatic HTTP response conversion via exception handlers
 - Pattern: `raise ServiceUnavailableError("MCP service is down")`
 

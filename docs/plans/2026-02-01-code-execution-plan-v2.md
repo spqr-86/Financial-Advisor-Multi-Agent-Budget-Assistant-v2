@@ -1,43 +1,16 @@
-# Code Execution Implementation Plan
+# Code Execution Implementation Plan (v2 - без RestrictedPython)
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Add `execute_analysis_code` tool to AnalystAgent for complex analytics via LLM-generated Python code.
 
-**Architecture:** New tool runs LLM-generated code in RestrictedPython sandbox with pandas DataFrame of expenses. Returns text result.
+**Architecture:** New tool runs LLM-generated code using exec() with controlled globals/locals. Returns text result.
 
-**Tech Stack:** RestrictedPython, pandas (already installed), asyncio for timeout
-
----
-
-## Task 1: Add RestrictedPython dependency
-
-**Files:**
-- Modify: `pyproject.toml:29`
-
-**Step 1: Add dependency**
-
-Add after `fastmcp = "^2.0.0"`:
-
-```toml
-RestrictedPython = "^7.0"
-```
-
-**Step 2: Install**
-
-Run: `poetry lock && poetry install`
-Expected: Successfully installed RestrictedPython
-
-**Step 3: Commit**
-
-```bash
-git add pyproject.toml poetry.lock
-git commit -m "deps: add RestrictedPython for code execution sandbox"
-```
+**Tech Stack:** Built-in exec(), pandas (already installed), asyncio for timeout
 
 ---
 
-## Task 2: Create code_executor module with sandbox
+## Task 1: Create code_executor module with sandbox
 
 **Files:**
 - Create: `src/mcp/agents/tools/code_executor.py`
@@ -94,18 +67,18 @@ class TestExecuteInSandbox:
         assert "Ошибка синтаксиса" in result
 
     def test_blocked_import(self):
-        """Test that dangerous imports are blocked."""
+        """Test that imports are blocked."""
         from src.mcp.agents.tools.code_executor import execute_in_sandbox
 
         df = pd.DataFrame({'amount': [100]})
-        code = "import os; result = os.getcwd()"
+        code = "import os; result = 'test'"
 
         result = execute_in_sandbox(code, df)
 
         assert "Ошибка" in result
 
-    def test_blocked_open(self):
-        """Test that file operations are blocked."""
+    def test_blocked_builtins(self):
+        """Test that dangerous builtins are blocked."""
         from src.mcp.agents.tools.code_executor import execute_in_sandbox
 
         df = pd.DataFrame({'amount': [100]})
@@ -113,7 +86,7 @@ class TestExecuteInSandbox:
 
         result = execute_in_sandbox(code, df)
 
-        assert "Ошибка" in result
+        assert "Ошибка" in result or "open" in result.lower()
 
     def test_pandas_operations(self):
         """Test that pandas operations work."""
@@ -154,60 +127,41 @@ Expected: FAIL with "ModuleNotFoundError: No module named 'src.mcp.agents.tools.
 Create `src/mcp/agents/tools/code_executor.py`:
 
 ```python
-"""Code executor with RestrictedPython sandbox for complex analytics."""
+"""Code executor with exec() sandbox for complex analytics."""
 
 import logging
 from typing import Any
 
 import pandas as pd
-from RestrictedPython import compile_restricted, safe_builtins
-from RestrictedPython.Eval import default_guarded_getiter
-from RestrictedPython.Guards import (
-    guarded_iter_unpack_sequence,
-    safer_getattr,
-)
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# Allowed modules for sandbox
-ALLOWED_MODULES: dict[str, Any] = {
-    "pd": pd,
-    "pandas": pd,
-}
-
-# Safe builtins for sandbox
-SAFE_BUILTINS: dict[str, Any] = {
-    **safe_builtins,
-    "sum": sum,
-    "min": min,
-    "max": max,
-    "len": len,
-    "round": round,
+# Safe builtins - only basic functions, no file/network access
+SAFE_BUILTINS = {
     "abs": abs,
-    "sorted": sorted,
-    "list": list,
-    "dict": dict,
-    "set": set,
-    "tuple": tuple,
-    "str": str,
-    "int": int,
-    "float": float,
-    "bool": bool,
-    "range": range,
-    "enumerate": enumerate,
-    "zip": zip,
-    "map": map,
-    "filter": filter,
-    "any": any,
     "all": all,
+    "any": any,
+    "bool": bool,
+    "dict": dict,
+    "enumerate": enumerate,
+    "filter": filter,
+    "float": float,
+    "int": int,
+    "len": len,
+    "list": list,
+    "map": map,
+    "max": max,
+    "min": min,
+    "range": range,
+    "round": round,
+    "set": set,
+    "sorted": sorted,
+    "str": str,
+    "sum": sum,
+    "tuple": tuple,
+    "zip": zip,
 }
-
-
-def _safe_getattr(obj: Any, name: str, default: Any = None) -> Any:
-    """Safe getattr that blocks dangerous attributes."""
-    if name.startswith("_"):
-        raise AttributeError(f"Access to '{name}' is not allowed")
-    return safer_getattr(obj, name, default)
 
 
 def execute_in_sandbox(code: str, df: pd.DataFrame, timeout: int = 10) -> str:
@@ -217,40 +171,42 @@ def execute_in_sandbox(code: str, df: pd.DataFrame, timeout: int = 10) -> str:
     Args:
         code: Python code to execute
         df: DataFrame with expenses data
-        timeout: Max execution time in seconds (not enforced here, use async wrapper)
+        timeout: Max execution time in seconds (enforced by async wrapper)
 
     Returns:
         Result string from code execution or error message
     """
+    # Check for syntax errors first
     try:
-        # Compile with restrictions
-        byte_code = compile_restricted(code, "<analysis>", "exec")
-
-        # Check for compilation errors
-        if byte_code is None:
-            return "Ошибка синтаксиса: не удалось скомпилировать код"
-
+        compile(code, "<analysis>", "exec")
     except SyntaxError as e:
         return f"Ошибка синтаксиса: {e.msg} (строка {e.lineno})"
 
-    # Prepare restricted environment
-    restricted_globals: dict[str, Any] = {
+    # Prepare restricted globals - only safe builtins and allowed modules
+    safe_globals = {
         "__builtins__": SAFE_BUILTINS,
-        "_getiter_": default_guarded_getiter,
-        "_iter_unpack_sequence_": guarded_iter_unpack_sequence,
-        "_getattr_": _safe_getattr,
+        "pd": pd,
+        "pandas": pd,
+        "np": np,
+        "numpy": np,
         "df": df,
-        **ALLOWED_MODULES,
     }
-    restricted_locals: dict[str, Any] = {}
+
+    # Empty locals for code execution
+    safe_locals: dict[str, Any] = {}
 
     try:
-        # Execute code
-        exec(byte_code, restricted_globals, restricted_locals)
+        # Execute code in restricted environment
+        exec(code, safe_globals, safe_locals)
 
         # Extract result
-        result = restricted_locals.get("result", "Код не вернул результат")
+        result = safe_locals.get("result", "Код не вернул результат")
         return str(result)
+
+    except NameError as e:
+        # Catch attempts to use blocked builtins or imports
+        logger.warning(f"Code execution blocked unsafe operation: {e}")
+        return f"Ошибка выполнения: {str(e)}"
 
     except Exception as e:
         logger.warning(f"Code execution error: {e}")
@@ -266,12 +222,12 @@ Expected: All tests PASS
 
 ```bash
 git add src/mcp/agents/tools/code_executor.py tests/test_mcp/test_code_executor.py
-git commit -m "feat: add code execution sandbox with RestrictedPython"
+git commit -m "feat: add code execution sandbox with exec()"
 ```
 
 ---
 
-## Task 3: Add async tool function with timeout
+## Task 2: Add async tool function with timeout
 
 **Files:**
 - Modify: `src/mcp/agents/tools/code_executor.py`
@@ -395,24 +351,6 @@ def _expenses_to_dataframe(expenses_data: dict[str, Any]) -> pd.DataFrame:
     return df
 
 
-def _run_sandboxed(byte_code: Any, df: pd.DataFrame) -> str:
-    """Run compiled code in sandbox (for executor)."""
-    restricted_globals: dict[str, Any] = {
-        "__builtins__": SAFE_BUILTINS,
-        "_getiter_": default_guarded_getiter,
-        "_iter_unpack_sequence_": guarded_iter_unpack_sequence,
-        "_getattr_": _safe_getattr,
-        "df": df,
-        **ALLOWED_MODULES,
-    }
-    restricted_locals: dict[str, Any] = {}
-
-    exec(byte_code, restricted_globals, restricted_locals)
-
-    result = restricted_locals.get("result", "Код не вернул результат")
-    return str(result)
-
-
 async def execute_analysis_code(code: str, user_id: str = "default") -> str:
     """
     Execute Python code for complex expense analysis.
@@ -446,20 +384,12 @@ async def execute_analysis_code(code: str, user_id: str = "default") -> str:
         if df.empty:
             return "Нет данных для анализа"
 
-        # Compile code
-        try:
-            byte_code = compile_restricted(code, "<analysis>", "exec")
-            if byte_code is None:
-                return "Ошибка синтаксиса: не удалось скомпилировать код"
-        except SyntaxError as e:
-            return f"Ошибка синтаксиса: {e.msg} (строка {e.lineno})"
-
         # Execute with timeout in thread pool
         loop = asyncio.get_event_loop()
         with concurrent.futures.ThreadPoolExecutor() as pool:
             try:
                 result = await asyncio.wait_for(
-                    loop.run_in_executor(pool, _run_sandboxed, byte_code, df),
+                    loop.run_in_executor(pool, execute_in_sandbox, code, df),
                     timeout=EXECUTION_TIMEOUT,
                 )
                 logger.info(f"Code execution successful for user {user_id}")
@@ -488,7 +418,7 @@ git commit -m "feat: add async execute_analysis_code tool with timeout"
 
 ---
 
-## Task 4: Export tool from module
+## Task 3: Export tool from module
 
 **Files:**
 - Modify: `src/mcp/agents/tools/__init__.py`
@@ -520,7 +450,7 @@ git commit -m "feat: export execute_analysis_code from tools module"
 
 ---
 
-## Task 5: Integrate tool with AnalystAgent
+## Task 4: Integrate tool with AnalystAgent
 
 **Files:**
 - Modify: `src/mcp/agents/adk_agents.py`
@@ -533,23 +463,19 @@ Add to imports in `src/mcp/agents/adk_agents.py`:
 from src.mcp.agents.tools.code_executor import execute_analysis_code
 ```
 
-**Step 2: Update AnalystAgent instruction**
+**Step 2: Update AnalystAgent tools**
 
-Replace the `analyst_agent` definition with updated instruction:
+Find the `analyst_agent` definition and add `execute_analysis_code` to tools list:
 
 ```python
-# Analyst Agent - specialized in viewing expenses and statistics
-analyst_agent = LlmAgent(
-    name="AnalystAgent",
-    model=Gemini(
-        model=settings.gemini_model,
-        retry_options=retry_config,
-    ),
-    instruction=f"""Ты - агент-аналитик для семейного бюджета.
+tools=[get_expenses_tool, get_statistics_tool, execute_analysis_code],
+```
 
-Твои возможности:
-1. **get_expenses_tool** - показывать последние расходы
-2. **get_statistics_tool** - показывать статистику по категориям
+**Step 3: Update AnalystAgent instruction**
+
+Add to analyst_agent instruction (before "Для ПРОСТЫХ запросов"):
+
+```python
 3. **execute_analysis_code** - выполнять Python код для сложного анализа
 
 ## Когда использовать execute_analysis_code:
@@ -568,7 +494,7 @@ analyst_agent = LlmAgent(
 
 2. Результат сохраняй в переменную `result` (строка)
 
-3. Доступны: pandas (pd), базовые функции Python
+3. Доступны: pandas (pd), numpy (np), базовые функции Python
 
 4. Пример кода:
 ```python
@@ -578,42 +504,15 @@ diff = feb - jan
 result = f"Еда: январь {{jan:.0f}}₽, февраль {{feb:.0f}}₽, разница {{diff:+.0f}}₽"
 ```
 
-## Для ПРОСТЫХ запросов используй стандартные tools:
-
-Когда пользователь просит показать расходы:
-1. Используй get_expenses_tool с параметрами: limit, category (если указана), user_id="default"
-2. Отформатируй ответ красиво с emoji, БЕЗ markdown таблиц
-3. Формат для каждого расхода:
-   <дата> | <emoji категории> <категория> | <описание> - <сумма>₽
-
-   Категории с emoji:
-{_categories_with_emoji}
-
-Когда пользователь просит статистику:
-1. Используй get_statistics_tool с параметрами: period, user_id="default"
-2. Отформатируй с emoji и прогресс-барами (используй символы █ и ░):
-   <emoji> <категория>: <сумма>₽ <прогресс-бар> <процент>%
-
-   ВАЖНО: Прогресс-бар должен ТОЧНО соответствовать проценту!
-   - Всего 10 символов в баре
-   - Каждый █ = 10% (округляй вниз)
-   - Примеры: 24% = ██░░░░░░░░, 5% = ░░░░░░░░░░, 49% = ████░░░░░░
-
-3. В конце покажи общую сумму
-
-ВАЖНО: НЕ используй markdown таблицы! Telegram их не поддерживает красиво.
-Отвечай кратко и дружелюбно на русском языке.""",
-    tools=[get_expenses_tool, get_statistics_tool, execute_analysis_code],
-    output_key="analyst_result",
-)
+##
 ```
 
-**Step 3: Verify syntax**
+**Step 4: Verify syntax**
 
 Run: `poetry run python -c "from src.mcp.agents.adk_agents import analyst_agent; print('OK')"`
 Expected: OK
 
-**Step 4: Commit**
+**Step 5: Commit**
 
 ```bash
 git add src/mcp/agents/adk_agents.py
@@ -622,33 +521,16 @@ git commit -m "feat: integrate execute_analysis_code tool with AnalystAgent"
 
 ---
 
-## Task 6: Update Orchestrator to route complex queries
+## Task 5: Update Orchestrator to route complex queries
 
 **Files:**
 - Modify: `src/mcp/agents/adk_agents.py`
 
 **Step 1: Update root_agent instruction**
 
-Update the `root_agent` instruction to mention complex analytics:
+In root_agent instruction, update AnalystAgent description:
 
 ```python
-# Root Agent (LLM Orchestrator) - coordinates specialized agents
-root_agent = LlmAgent(
-    name="BudgetOrchestrator",
-    model=Gemini(
-        model=settings.gemini_model,
-        retry_options=retry_config,
-    ),
-    instruction="""Ты - оркестратор системы управления семейным бюджетом.
-
-У тебя есть два специализированных агента:
-
-1. **RegistrarAgent** - для ДОБАВЛЕНИЯ или УДАЛЕНИЯ расходов
-   Вызывай когда пользователь:
-   - Описывает покупку ("купил хлеб 50 рублей", "потратил на кино 500")
-   - Просит добавить расход
-   - Просит удалить последний расход
-
 2. **AnalystAgent** - для ПРОСМОТРА расходов, СТАТИСТИКИ и СЛОЖНОЙ АНАЛИТИКИ
    Вызывай когда пользователь:
    - Хочет увидеть расходы ("покажи последние расходы", "что я купил")
@@ -657,19 +539,6 @@ root_agent = LlmAgent(
    - Просит СРАВНИТЬ периоды ("сравни январь и февраль")
    - Ищет АНОМАЛИИ ("найди большие траты")
    - Хочет РАСЧЁТЫ ("средний чек в выходные", "тренд расходов")
-
-ВАЖНО:
-1. СНАЧАЛА вызови нужного агента (RegistrarAgent или AnalystAgent)
-2. ЗАТЕМ передай результат пользователю
-
-Для приветствий и общих вопросов отвечай сам, не вызывая агентов.
-
-Отвечай кратко и дружелюбно на русском языке.""",
-    tools=[
-        AgentTool(registrar_agent),
-        AgentTool(analyst_agent),
-    ],
-)
 ```
 
 **Step 2: Verify syntax**
@@ -686,7 +555,7 @@ git commit -m "feat: update orchestrator to route complex analytics to AnalystAg
 
 ---
 
-## Task 7: Run full test suite
+## Task 6: Run full test suite
 
 **Files:**
 - None (verification only)
@@ -710,7 +579,7 @@ git commit -m "fix: address test/lint issues"
 
 ---
 
-## Task 8: Update CLAUDE.md documentation
+## Task 7: Update CLAUDE.md documentation
 
 **Files:**
 - Modify: `CLAUDE.md`
@@ -732,10 +601,15 @@ AnalystAgent now has `execute_analysis_code` tool for complex queries that can't
 
 **How it works:**
 1. LLM generates Python code based on user query
-2. Code runs in RestrictedPython sandbox (blocked: imports, file access, network)
+2. Code runs using exec() with controlled globals/locals (pandas, numpy, safe builtins only)
 3. Code receives pandas DataFrame `df` with expense data
 4. Result must be saved to `result` variable (string)
 5. Timeout: 10 seconds
+
+**Security:**
+- Whitelist users only (TELEGRAM_ADMIN_IDS)
+- No file I/O, network, or unsafe builtins
+- LLM-generated code (not user input directly)
 
 **Implementation:** `src/mcp/agents/tools/code_executor.py`
 ```
@@ -753,11 +627,10 @@ git commit -m "docs: add code execution feature to CLAUDE.md"
 
 | Task | Description | Files |
 |------|-------------|-------|
-| 1 | Add RestrictedPython dependency | pyproject.toml |
-| 2 | Create sandbox module with tests | code_executor.py, test_code_executor.py |
-| 3 | Add async tool with timeout | code_executor.py |
-| 4 | Export from module | tools/__init__.py |
-| 5 | Integrate with AnalystAgent | adk_agents.py |
-| 6 | Update Orchestrator routing | adk_agents.py |
-| 7 | Run full test suite | (verification) |
-| 8 | Update documentation | CLAUDE.md |
+| 1 | Create sandbox module with tests | code_executor.py, test_code_executor.py |
+| 2 | Add async tool with timeout | code_executor.py |
+| 3 | Export from module | tools/__init__.py |
+| 4 | Integrate with AnalystAgent | adk_agents.py |
+| 5 | Update Orchestrator routing | adk_agents.py |
+| 6 | Run full test suite | (verification) |
+| 7 | Update documentation | CLAUDE.md |

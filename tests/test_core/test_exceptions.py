@@ -7,10 +7,7 @@ from fastapi.responses import JSONResponse
 from src.core.exceptions import (
     BudgetException,
     ServiceUnavailableError,
-    ValidationError,
-    NotFoundError,
     RateLimitError,
-    AgentError,
     budget_exception_handler,
 )
 
@@ -37,29 +34,10 @@ def test_service_unavailable_error():
     assert exc.detail == "Service temporarily unavailable"
 
 
-def test_validation_error():
-    """Test ValidationError."""
-    exc = ValidationError()
-    assert exc.status_code == 400
-
-
-def test_not_found_error():
-    """Test NotFoundError."""
-    exc = NotFoundError()
-    assert exc.status_code == 404
-
-
 def test_rate_limit_error():
     """Test RateLimitError."""
     exc = RateLimitError()
     assert exc.status_code == 429
-
-
-def test_agent_error():
-    """Test AgentError."""
-    exc = AgentError()
-    assert exc.status_code == 500
-    assert exc.code == "AGENT_ERROR"
 
 
 @pytest.mark.asyncio
