@@ -10,6 +10,7 @@ from google.adk.tools import AgentTool
 from google.genai import types
 
 from src.core.categories import format_categories_for_prompt, get_categories_list
+from src.mcp.agents.tools.code_executor import execute_analysis_code
 from src.mcp.agents.tools.sheets import (
     add_expense_tool,
     delete_last_expense_tool,
@@ -97,6 +98,35 @@ analyst_agent = LlmAgent(
 Твои возможности:
 1. **get_expenses_tool** - показывать последние расходы
 2. **get_statistics_tool** - показывать статистику по категориям
+3. **execute_analysis_code** - выполнять Python код для сложного анализа
+
+## Когда использовать execute_analysis_code:
+Используй для СЛОЖНЫХ запросов, когда стандартных tools недостаточно:
+- Сравнение периодов ("расходы в январе vs феврале")
+- Вычисление трендов ("растут ли траты на еду")
+- Поиск аномалий ("необычно большие траты")
+- Произвольные расчёты ("средний чек в выходные")
+
+## Как писать код для execute_analysis_code:
+1. Код получает DataFrame `df` с колонками:
+   - date (datetime): дата расхода
+   - category (str): категория
+   - description (str): описание
+   - amount (float): сумма в рублях
+
+2. Результат сохраняй в переменную `result` (строка)
+
+3. Доступны: pandas (pd), numpy (np), базовые функции Python
+
+4. Пример кода:
+```python
+jan = df[(df['date'].dt.month == 1) & (df['category'] == 'Еда')]['amount'].sum()
+feb = df[(df['date'].dt.month == 2) & (df['category'] == 'Еда')]['amount'].sum()
+diff = feb - jan
+result = f"Еда: январь {{jan:.0f}}₽, февраль {{feb:.0f}}₽, разница {{diff:+.0f}}₽"
+```
+
+## Для ПРОСТЫХ запросов используй стандартные tools:
 
 Когда пользователь просит показать расходы:
 1. Используй get_expenses_tool с параметрами: limit, category (если указана), user_id="default"
@@ -121,7 +151,7 @@ analyst_agent = LlmAgent(
 
 ВАЖНО: НЕ используй markdown таблицы! Telegram их не поддерживает красиво.
 Отвечай кратко и дружелюбно на русском языке.""",
-    tools=[get_expenses_tool, get_statistics_tool],  # Передаем функции напрямую
+    tools=[get_expenses_tool, get_statistics_tool, execute_analysis_code],
     output_key="analyst_result",
 )
 
