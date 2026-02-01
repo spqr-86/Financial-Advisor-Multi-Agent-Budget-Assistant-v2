@@ -367,6 +367,8 @@ class GoogleSheetsStorage(StorageInterface):
 
             # Calculate date range based on period
             now = datetime.now()
+            end_date = None  # For specific month periods
+
             if period == "day":
                 start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
             elif period == "week":
@@ -382,6 +384,20 @@ class GoogleSheetsStorage(StorageInterface):
                 )
             elif period == "year":
                 start_date = now - timedelta(days=365)
+            elif "_" in period:
+                # Specific month: YYYY_MM format (e.g., "2026_01" for January 2026)
+                try:
+                    year_str, month_str = period.split("_")
+                    year = int(year_str)
+                    month = int(month_str)
+                    start_date = datetime(year, month, 1)
+                    # End date: first day of next month
+                    if month == 12:
+                        end_date = datetime(year + 1, 1, 1)
+                    else:
+                        end_date = datetime(year, month + 1, 1)
+                except ValueError:
+                    start_date = None
             else:
                 start_date = None  # All time
 
@@ -399,7 +415,9 @@ class GoogleSheetsStorage(StorageInterface):
                     try:
                         row_date = datetime.strptime(date_str, "%d.%m.%Y")
                         if row_date < start_date:
-                            continue  # Skip rows outside period
+                            continue  # Skip rows before period
+                        if end_date and row_date >= end_date:
+                            continue  # Skip rows after period (for specific months)
                     except ValueError:
                         pass  # Include rows with invalid dates
 
