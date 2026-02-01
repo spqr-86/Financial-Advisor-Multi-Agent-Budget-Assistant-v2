@@ -11,9 +11,11 @@ Budget Assistant is an intelligent financial management bot that helps track exp
 - 🤖 Multi-agent AI system with specialized agents (Orchestrator, Registrar, Analyst)
 - 📊 Automatic categorization and Google Sheets integration
 - 📈 Expense statistics and analysis
+- 🧮 Complex analytics via LLM-generated code execution (comparisons, trends, anomalies)
+- 🔌 MCP Server for Claude Desktop integration
 - 🔒 User access control
 - ☁️ Cloud-native deployment on Google Cloud Run
-- ⚡ Interactive UI with keyboards, buttons, and rich formatting (Iteration 10-11)
+- ⚡ Interactive UI with keyboards, buttons, and rich formatting
 
 ## Architecture
 
@@ -66,11 +68,33 @@ export GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
 ## Documentation
 
 - **[CLAUDE.md](CLAUDE.md)** - Complete developer guide and architecture overview
+- **[MCP Server](docs/MCP_SERVER.md)** - Claude Desktop integration guide
 - **[Cloud Run Operations](docs/CLOUD_RUN_OPERATIONS.md)** - Production operations guide
 - **[Google Cloud Setup](docs/GOOGLE_CLOUD_SETUP.md)** - Cloud deployment instructions
 - **[Testing Guide](docs/TESTING.md)** - Testing strategies and procedures
-- **[Code Guide](docs/CODE_GUIDE.md)** - Beginner-friendly architecture guide (Russian)
-- **[UX/UI Design](docs/UX_UI_DESIGN.md)** - Interactive UI design guide
+
+## MCP Server (Claude Desktop)
+
+Budget Assistant can be used directly from Claude Desktop via MCP protocol:
+
+```bash
+# Run MCP server for Claude Desktop
+./scripts/run_mcp_stdio.sh
+```
+
+Configure in `~/Library/Application Support/Claude/claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "budget-assistant": {
+      "command": "/path/to/budget-assistant-v2/scripts/run_mcp_stdio.sh",
+      "cwd": "/path/to/budget-assistant-v2"
+    }
+  }
+}
+```
+
+See [MCP Server docs](docs/MCP_SERVER.md) for details.
 
 ## Tech Stack
 
@@ -80,13 +104,15 @@ export GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
 | Web Framework | FastAPI 0.115+ |
 | AI Framework | google-adk 1.20+ (Agent Development Kit) |
 | AI Model | Google Gemini (gemini-2.0-flash) |
+| Data Analysis | pandas, numpy (for code execution sandbox) |
+| MCP Server | fastmcp 2.0+ (Claude Desktop integration) |
 | Storage | Google Sheets via gspread |
 | Deployment | Google Cloud Run + Secret Manager |
 | Testing | pytest + pytest-asyncio |
 
 ## Project Status
 
-**Current**: Iteration 11 - UX/UI Phase 2 complete
+**Current**: Iteration 12 - Code Execution for Complex Analytics
 
 - ✅ Microservices architecture (3 services)
 - ✅ Multi-agent AI system with google-adk
@@ -94,8 +120,9 @@ export GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
 - ✅ Cloud Run deployment with Docker
 - ✅ Secret Manager integration
 - ✅ Production polish (timeouts, logging, graceful shutdown)
-- ✅ Interactive UI Phase 1 (keyboards, buttons, HTML formatting)
-- ✅ Interactive UI Phase 2 (FSM-based structured input with reply keyboards)
+- ✅ Interactive UI (keyboards, buttons, HTML formatting, FSM)
+- ✅ MCP Server for Claude Desktop integration
+- ✅ Code execution for complex analytics (pandas/numpy sandbox)
 - 🔄 Monitoring and visualizations (Phase 3)
 
 ## Requirements
