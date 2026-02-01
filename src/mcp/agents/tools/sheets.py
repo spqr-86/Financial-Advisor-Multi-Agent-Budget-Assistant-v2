@@ -99,12 +99,21 @@ async def get_statistics_tool(
     Получить статистику расходов по категориям.
 
     Args:
-        period: Период (day, week, month, year) - пока не используется,
-                показывает все расходы
+        period: Период статистики. Варианты:
+                - "day" - за сегодня
+                - "week" - за текущую неделю (с понедельника)
+                - "month" - за текущий месяц
+                - "year" - за год
+                - "YYYY_MM" - за конкретный месяц (например "2026_01" для января 2026)
         user_id: ID пользователя (опционально)
 
     Returns:
         Статистика: общая сумма и суммы по категориям
+
+    Examples:
+        - get_statistics_tool(period="week") - статистика за неделю
+        - get_statistics_tool(period="2026_01") - статистика за январь 2026
+        - get_statistics_tool(period="2025_12") - статистика за декабрь 2025
     """
     storage = get_storage()
     result = await storage.get_statistics(
