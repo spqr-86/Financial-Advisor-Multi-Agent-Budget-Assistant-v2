@@ -96,6 +96,70 @@ sequenceDiagram
 *   Добавить в словарь `CATEGORY_EMOJI`.
 *   AI подхватит изменение автоматически (словарь загружается в промпт через Jinja2).
 
+### ✏️ Хочу изменить промпт агента и протестировать
+
+**Где находятся промпты:**
+*   `prompts/agents/orchestrator.j2` — промпт главного оркестратора
+*   `prompts/agents/registrar.j2` — промпт агента добавления/удаления расходов
+*   `prompts/agents/analyst.j2` — промпт агента статистики и аналитики
+
+**Как редактировать:**
+1.  Открыть нужный `.j2` файл в редакторе
+2.  Промпты используют Jinja2-шаблоны с переменными:
+    *   `{{ categories }}` — список категорий (registrar.j2)
+    *   `{{ categories_with_emoji }}` — категории с эмодзи (analyst.j2)
+    *   `{{ current_date }}` — текущая дата в формате DD.MM.YYYY (analyst.j2)
+3.  Сохранить изменения
+
+**Примеры изменений:**
+```jinja
+{# Было: #}
+Ты - агент-регистратор для семейного бюджета.
+
+{# Стало (более строгий тон): #}
+Ты - агент-регистратор для семейного бюджета.
+Твоя задача — ТОЧНО извлечь сумму и категорию из сообщения пользователя.
+```
+
+**Как протестировать:**
+
+*   **Вариант 1: Локально (polling)**
+    ```bash
+    # Перезапустить MCP сервис (он загружает промпты при старте)
+    # Ctrl+C в терминале MCP, затем:
+    poetry run python -m src.mcp.app
+
+    # Или через docker-compose:
+    docker-compose restart mcp
+
+    # Протестировать через бот
+    poetry run python -m src.bot.run_polling
+    # Написать боту тестовое сообщение
+    ```
+
+*   **Вариант 2: Cloud Run (production)**
+    ```bash
+    # Redeploy MCP сервиса с новыми промптами
+    ./scripts/deploy_mcp.sh
+
+    # Проверить логи
+    gcloud run services logs read budget-mcp --limit=20
+    ```
+
+*   **Вариант 3: Прямое тестирование через MCP Server**
+    ```bash
+    # Запустить MCP в stdio режиме
+    poetry run python -m src.mcp.server.run_stdio
+
+    # Или использовать MCP Inspector
+    ./scripts/test_mcp_inspector.sh
+    # Открыть http://localhost:8083 в браузере
+    ```
+
+**Полезные ресурсы:**
+*   `prompts/agents/README.md` — документация по prompt engineering техникам
+*   `prompts/loader.py` — код загрузчика промптов (если нужно добавить переменные)
+
 ### 🧪 Хочу написать тест
 *   **Структура:** `tests/test_bot/`, `tests/test_api/`, `tests/test_mcp/`.
 *   **Запуск:** `poetry run pytest` (все) или `poetry run pytest tests/path/to/test.py`.
