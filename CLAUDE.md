@@ -813,7 +813,7 @@ MCP_SSE_PORT=8083
 
 ## Additional Documentation
 
-- `docs/CODE_GUIDE.md` - Beginner-friendly architecture guide (Russian)
+- `docs/CODEBASE_ANALYSIS.md` - Beginner-friendly architecture guide (Russian)
 - `docs/TESTING.md` - Testing strategies and manual test procedures
 - `docs/REBUILD_PLAN.md` - Complete 10-iteration development plan
 - `docs/GOOGLE_CLOUD_SETUP.md` - Cloud deployment instructions
