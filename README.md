@@ -29,34 +29,34 @@ Telegram-бот, который понимает естественный язы
 
 ## 🧠 Ключевые AI-решения
 
-### Multi-Agent System
-- **Orchestrator-Worker паттерн** — root agent маршрутизирует к специализированным агентам
-- **Tool-calling architecture** — агенты используют Python functions как tools
-- **Fallback handling** — graceful degradation при API quota exhausted
+### Мультиагентная система
+- **Паттерн "Оркестратор-Исполнитель"** — главный агент направляет запросы специализированным агентам
+- **Архитектура вызова инструментов** — агенты используют Python-функции как инструменты
+- **Обработка отказов** — корректная деградация при исчерпании квоты API
 
-### LLM Code Execution
-- **Sandboxed Python interpreter** — безопасное выполнение LLM-generated кода
-- **Controlled globals** — только pandas/numpy, без file I/O/network
-- **Timeout mechanism** — 10s limit для предотвращения зависаний
+### Выполнение кода языковой моделью
+- **Изолированный интерпретатор Python** — безопасное выполнение кода, генерируемого моделью
+- **Контролируемое окружение** — только pandas/numpy, без доступа к файлам и сети
+- **Ограничение времени выполнения** — лимит 10 секунд для предотвращения зависаний
 
-### Production AI Engineering
-- **Retry with exponential backoff** — 4 попытки с 1s→2s→4s→8s
-- **Quota management** — переключение между моделями (gemini-2.0-flash vs 2.5-flash)
-- **Structured outputs** — Pydantic schemas для валидации AI responses
-- **FSM-based conversations** — state machine для multi-turn диалогов
+### Продакшен-готовые решения
+- **Повторы с экспоненциальной задержкой** — 4 попытки с интервалами 1s→2s→4s→8s
+- **Управление квотами** — переключение между моделями (gemini-2.0-flash vs 2.5-flash)
+- **Структурированные выходы** — Pydantic-схемы для валидации ответов AI
+- **Разговоры с состояниями** — конечный автомат (FSM) для многошаговых диалогов
 
-### Prompt Engineering
-- **Role-based prompts** — специализированные инструкции для каждого агента (Orchestrator, Registrar, Analyst)
-- **Few-shot examples** — примеры в промптах для consistent форматирования (progress bars, emoji)
-- **Dynamic context injection** — categories list, current date, period formats инжектятся в runtime
-- **Tool-use instructions** — детальные guide когда использовать какой tool (execute_analysis_code triggers)
-- **Constraint prompts** — явные запреты ("НЕ симулируй добавление", "ОБЯЗАТЕЛЬНО вызови tool")
-- **Structured outputs** — промпты для генерации HTML formatting, table structures
+### Промпт-инжиниринг
+- **Промпты на основе ролей** — специализированные инструкции для каждого агента (Оркестратор, Регистратор, Аналитик)
+- **Few-shot примеры** — примеры в промптах для единообразного форматирования (progress bars, emoji)
+- **Динамическое внедрение контекста** — список категорий, текущая дата, форматы периодов добавляются во время выполнения через Jinja2-шаблоны
+- **Инструкции по использованию инструментов** — детальные указания когда использовать какой инструмент (триггеры для execute_analysis_code)
+- **Ограничивающие промпты** — явные запреты ("НЕ симулируй добавление", "ОБЯЗАТЕЛЬНО вызови инструмент")
+- **Структурированные выходы** — промпты для генерации HTML-форматирования и табличных структур
 
-### Performance Optimizations
-- **Atomic operations** — `append_row()` вместо read→update для устранения race conditions
-- **Caching** — 60s TTL для budget limits
-- **Lazy connections** — thread-safe connection pooling с `asyncio.Lock()`
+### Оптимизация производительности
+- **Атомарные операции** — `append_row()` вместо read→update для устранения условий гонки
+- **Кэширование** — 60 секунд для лимитов бюджета
+- **Ленивые соединения** — потокобезопасный пул соединений с `asyncio.Lock()`
 
 ---
 
@@ -78,7 +78,7 @@ cp .env.example .env
 docker-compose up
 ```
 
-**Готово!** Бот работает в режиме polling (без webhook).
+**Готово!** Бот работает в режиме опроса (без webhook).
 
 ### Вариант 2: В облаке (Google Cloud Run)
 
@@ -191,10 +191,10 @@ gcloud run services logs read budget-bot --limit=50
 2. **API** — маршрутизация, валидация
 3. **MCP** — AI агенты, бизнес-логика, Google Sheets
 
-**Multi-Agent система:**
-- **Orchestrator** — понимает намерение пользователя
-- **Registrar** — добавляет/удаляет расходы
-- **Analyst** — показывает статистику, выполняет аналитику
+**Мультиагентная система:**
+- **Оркестратор** — понимает намерение пользователя
+- **Регистратор** — добавляет/удаляет расходы
+- **Аналитик** — показывает статистику, выполняет аналитику
 
 ---
 
@@ -215,16 +215,17 @@ gcloud run services logs read budget-bot --limit=50
 
 ## 📈 Статус проекта
 
-**Текущая итерация:** 13 (Storage Reliability)
+**Текущая итерация:** 13+ (Промпт-инжиниринг)
 
 - ✅ Микросервисная архитектура (3 сервиса)
-- ✅ Multi-agent AI система (Orchestrator, Registrar, Analyst)
-- ✅ Интеграция с Google Sheets (атомарные операции, без race conditions)
+- ✅ Мультиагентная AI система (Оркестратор, Регистратор, Аналитик)
+- ✅ Интеграция с Google Sheets (атомарные операции, без условий гонки)
 - ✅ Деплой в Google Cloud Run
-- ✅ Интерактивный UI (кнопки, клавиатуры, FSM)
+- ✅ Интерактивный UI (кнопки, клавиатуры, конечный автомат)
 - ✅ MCP Server для Claude Desktop
 - ✅ Выполнение Python-кода для сложной аналитики
 - ✅ Бюджетные лимиты с предупреждениями
+- ✅ Jinja2-шаблоны промптов для упрощения итераций
 - 🔄 **Дальше:** визуализации (графики), экспорт данных, мониторинг
 
 ---
@@ -241,14 +242,14 @@ gcloud run services logs read budget-bot --limit=50
 
 ## 🎯 Решённые технические вызовы
 
-1. **LLM hallucinations & unreliable outputs** — structured prompts с constraint instructions, tool validation, Pydantic schemas
-2. **Multi-step reasoning** — orchestrator-worker pattern с dedicated agents для разных task types
-3. **Context injection** — dynamic prompts с categories/dates/formats, инжекция в runtime
-4. **Race conditions в Google Sheets** — переход с `get→calculate→update` на атомарный `append_row()`
-5. **Quota management** — dynamic model switching + retry logic с exponential backoff
-6. **State consistency** — FSM для multi-turn диалогов без external state store
-7. **Security в code execution** — sandboxed interpreter с whitelist imports, 10s timeout
-8. **Thread safety** — `asyncio.Lock()` для connection pooling, атомарные операции
+1. **Галлюцинации LLM и ненадёжные выходы** — структурированные промпты с ограничениями, валидация инструментов, Pydantic-схемы
+2. **Многошаговые рассуждения** — паттерн "Оркестратор-Исполнитель" со специализированными агентами для разных типов задач
+3. **Внедрение контекста** — динамические промпты с категориями/датами/форматами, загрузка во время выполнения
+4. **Условия гонки в Google Sheets** — переход с `get→calculate→update` на атомарный `append_row()`
+5. **Управление квотами** — динамическое переключение моделей + логика повторов с экспоненциальной задержкой
+6. **Согласованность состояния** — конечный автомат (FSM) для многошаговых диалогов без внешнего хранилища
+7. **Безопасность при выполнении кода** — изолированный интерпретатор с белым списком импортов, таймаут 10с
+8. **Потокобезопасность** — `asyncio.Lock()` для пула соединений, атомарные операции
 
 ---
 
