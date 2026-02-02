@@ -113,17 +113,16 @@ export GOOGLE_API_KEY=xxx
 
 - **[Быстрый старт с Claude Desktop](docs/CLAUDE_DESKTOP_CONFIG.md)** — используйте бот прямо из Claude
 - **[MCP Server](docs/MCP_SERVER.md)** — интеграция с Claude Desktop
-- **[Примеры использования](CLAUDE.md#bot-command-handlers-iteration-10)** — все возможности бота
 
 ### Для разработчиков
 
 | Документ | Описание |
 |----------|----------|
-| **[CLAUDE.md](CLAUDE.md)** | 📖 Полное руководство по архитектуре и разработке |
-| **[docs/CODEBASE_ANALYSIS.md](docs/CODEBASE_ANALYSIS.md)** | 🔍 Анализ кодовой базы для новичков (на русском) |
+| **[docs/CODEBASE_ANALYSIS.md](docs/CODEBASE_ANALYSIS.md)** | 🔍 Анализ кодовой базы и архитектуры (на русском) |
 | **[docs/TESTING.md](docs/TESTING.md)** | 🧪 Тестирование и CI/CD |
 | **[docs/CLOUD_RUN_OPERATIONS.md](docs/CLOUD_RUN_OPERATIONS.md)** | ☁️ Операции в продакшене |
 | **[docs/UX_UI_DESIGN.md](docs/UX_UI_DESIGN.md)** | 🎨 UX/UI паттерны и клавиатуры |
+| **[docs/MCP_SERVER.md](docs/MCP_SERVER.md)** | 🔌 Техническая документация MCP |
 
 ### Быстрая диагностика проблем
 
@@ -201,7 +200,7 @@ gcloud run services logs read budget-bot --limit=50
 
 Это личный проект, но фидбек и предложения приветствуются!
 
-1. Изучите [CLAUDE.md](CLAUDE.md) — там все гайдлайны
+1. Изучите документацию в `/docs` перед началом работы
 2. Соблюдайте стиль кода (ruff formatting)
 3. Добавляйте тесты для новых фич
 4. Поддерживайте покрытие тестами ≥50%
@@ -218,4 +217,4 @@ Private project — All rights reserved
 
 Разработано с помощью Claude (Anthropic).
 
-**Нужна помощь?** Смотрите документацию в `/docs` или troubleshooting в [CLAUDE.md](CLAUDE.md#common-gotchas).
+**Нужна помощь?** Смотрите документацию в `/docs` или раздел "Быстрая диагностика проблем" выше.
