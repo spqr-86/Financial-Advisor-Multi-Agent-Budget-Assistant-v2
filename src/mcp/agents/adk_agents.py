@@ -263,6 +263,10 @@ class ADKBudgetAgent:
 
             # Extract text from events
             response_text = ""
+            if events is None:
+                logger.warning("ADK runner returned None events")
+                return "Извините, не смог обработать запрос."
+
             for event in events:
                 if event.content and event.content.parts:
                     for part in event.content.parts:

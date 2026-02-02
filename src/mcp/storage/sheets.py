@@ -227,6 +227,9 @@ class GoogleSheetsStorage(StorageInterface):
             limit_exceeded = None
             if category in limits:
                 all_values = await self._run_sync(worksheet.get, "A:D")
+                # Defensive check: worksheet.get may return None for empty ranges
+                if all_values is None:
+                    all_values = []
                 spent_before = self._calculate_month_spent_for_category(
                     all_values, category
                 )
@@ -473,7 +476,8 @@ class GoogleSheetsStorage(StorageInterface):
             # Read only column A to find row count (optimization: O(n) vs O(n*4))
             col_a = await self._run_sync(worksheet.get, "A:A")
 
-            if not col_a or len(col_a) <= 1:
+            # Defensive check: worksheet.get may return None for empty ranges
+            if col_a is None or len(col_a) <= 1:
                 return {
                     "status": "error",
                     "error": "No expenses to delete",
