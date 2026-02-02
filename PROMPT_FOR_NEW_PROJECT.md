@@ -12,7 +12,6 @@
 - **Назначение:** [ЧТО_ДЕЛАЕТ_ПРОЕКТ]
 - **Технологии:** [ОСНОВНОЙ_СТЕК]
 - **Язык документации:** [русский/английский]
-- **Использует LLM:** [да/нет]
 
 ## Задачи
 
@@ -28,10 +27,11 @@
 - 5-7 ключевых преимуществ (чекбоксы ✅)
 - Идеально для: [use cases]
 
-#### 🧠 Ключевые [AI/технические] решения (если применимо)
-- Архитектурные паттерны
+#### 🧠 Ключевые технические решения
+- Архитектурные паттерны и подходы
 - Production-ready решения
 - Оптимизации производительности
+- Решённые технические вызовы
 
 #### 🚀 Как быстро запустить?
 - Вариант 1: Локально
@@ -84,12 +84,9 @@
 - **Хочу понять [компонент B]** — 2-3 ключевых файла
 - **Хочу добавить новую фичу** — пошаговый гайд
 - **Хочу пофиксить баг** — где логи, типичные ошибки
-- **Хочу изменить промпт и протестировать** (если используешь LLM):
-  - Где находятся промпты
-  - Как редактировать (Jinja2 синтаксис)
-  - Как протестировать (3 варианта)
 - **Хочу написать тест** — структура, команды
 - **Хочу задеплоить** — команды деплоя
+- **Хочу проверить документацию** — как тестировать актуальность документов
 
 #### 🗺 Карта кодовой базы
 - Таблицы файлов по слоям/модулям
@@ -102,88 +99,83 @@
 
 ---
 
-### 3. Система промптов (ТОЛЬКО если используешь LLM)
+### 3. docs/TESTING_DOCS.md (тестирование документации)
 
-Создай структуру:
-```
-prompts/
-├── agents/                    # или другое название
-│   ├── README.md             # Документация prompt engineering
-│   └── [agent_name].j2       # Промпты (пока пустые, я заполню)
-└── loader.py                 # Загрузчик с Jinja2
-```
+Создай гайд по проверке актуальности документации:
 
-#### prompts/loader.py
-```python
-"""Prompt loader utility using Jinja2 templates."""
+#### 📋 Что проверяем
 
-import logging
-from datetime import datetime
-from pathlib import Path
+**1. Ссылки и референсы**
+- Все внутренние ссылки работают (например: `[CLAUDE.md](CLAUDE.md)`)
+- Ссылки на файлы кода существуют и актуальны
+- Внешние ссылки доступны (не 404)
 
-from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+**2. Примеры кода**
+- Команды в README запускаются без ошибок
+- Примеры кода соответствуют текущей кодовой базе
+- Пути к файлам правильные
+- Импорты не устарели
 
-logger = logging.getLogger(__name__)
+**3. Версии и зависимости**
+- Версии технологий в таблице соответствуют pyproject.toml/package.json
+- Команды установки актуальны
+- Environment variables documented правильно
 
-# Base directory for prompts
-PROMPTS_DIR = Path(__file__).parent
-AGENTS_DIR = PROMPTS_DIR / "agents"  # или твоё название
+**4. Структура проекта**
+- Описание файлов соответствует реальной структуре
+- Архитектурные диаграммы отражают текущее состояние
+- Новые компоненты документированы
 
-# Jinja2 environment
-_env = Environment(
-    loader=FileSystemLoader(AGENTS_DIR),
-    autoescape=False,
-)
+#### 🧪 Как тестировать
 
+**Автоматизированная проверка:**
+```bash
+# Проверка внутренних ссылок
+find docs -name "*.md" -exec grep -o '\[.*\](.*\.md)' {} \; | \
+  sed 's/.*(\(.*\))/\1/' | while read file; do
+    [ -f "$file" ] || echo "❌ Missing: $file"
+  done
 
-def load_prompt(name: str, **variables) -> str:
-    """
-    Load and render a prompt template.
+# Проверка упомянутых файлов кода
+grep -r "src/.*\.py" docs/ README.md | \
+  grep -o 'src/[^)]*\.py' | sort -u | while read file; do
+    [ -f "$file" ] || echo "❌ Missing: $file"
+  done
 
-    Args:
-        name: Template name without extension (e.g., "agent1")
-        **variables: Variables to inject into the template
-
-    Returns:
-        Rendered prompt string
-    """
-    template_name = f"{name}.j2"
-
-    try:
-        template = _env.get_template(template_name)
-        rendered = template.render(**variables)
-        logger.debug(f"Loaded prompt '{name}' with {len(variables)} variables")
-        return rendered
-    except TemplateNotFound:
-        logger.error(f"Prompt template not found: {template_name}")
-        raise FileNotFoundError(f"Prompt not found: {AGENTS_DIR / template_name}")
-
-
-# Добавь функции-хелперы для каждого промпта:
-# def load_agent1_prompt(**kwargs) -> str:
-#     return load_prompt("agent1", **kwargs)
+# Проверка команд (выборочно)
+grep -A 1 '```bash' README.md | grep -v '^--$' | grep -v '```'
 ```
 
-#### prompts/agents/README.md
-Документируй использованные prompt engineering техники:
+**Ручная проверка:**
+1. Прочитай README от начала до конца — всё понятно?
+2. Пройди "Как быстро запустить?" — работает?
+3. Открой каждую ссылку из "Куда идти дальше?"
+4. Проверь примеры команд — запускаются?
+5. Сравни версии в README с pyproject.toml/package.json
 
-1. **Role-Based Instructions** — чёткое определение роли
-2. **Explicit Tool-Use Instructions** — когда и как использовать инструменты
-3. **Constraint Prompts** — явные запреты
-4. **Few-Shot Examples** — примеры в промптах
-5. **Trigger Lists** — списки триггеров для действий
-6. **Dynamic Context Injection** — переменные через Jinja2
-7. **Output Format Specifications** — детальное форматирование
-8. **Orchestrator Pattern** (если multi-agent) — делегирование задач
+#### 📅 Когда обновлять документацию
 
-Для каждой техники:
-- Почему используется
-- Пример из промпта
-- Результат
+**Обязательно:**
+- ✅ Добавлен новый компонент/сервис → обновить архитектуру
+- ✅ Изменились команды запуска → обновить README
+- ✅ Добавлена зависимость → обновить таблицу технологий
+- ✅ Изменилась структура файлов → обновить CODEBASE_ANALYSIS
+- ✅ Новая major version → обновить статус проекта
 
-Также добавь:
-- Как менять промпты (edit .j2 → restart service)
-- Как тестировать (локально, staging, production)
+**Желательно:**
+- Новая фича → добавить пример использования
+- Оптимизация → обновить метрики (если есть)
+- Рефакторинг → проверить актуальность путей
+
+#### ✅ Чеклист перед коммитом
+
+При изменении кода проверь:
+- [ ] README.md актуален (команды, примеры)
+- [ ] docs/CODEBASE_ANALYSIS.md отражает структуру
+- [ ] Новые файлы документированы
+- [ ] Ссылки не битые
+- [ ] Версии зависимостей совпадают
+- [ ] Примеры кода рабочие
 
 ---
 
@@ -213,9 +205,9 @@ def load_prompt(name: str, **variables) -> str:
 - Docstring style
 
 #### 🤖 [Специфика проекта]
-- AI Agent System (если есть)
-- Storage Layer patterns
-- API structure
+- Архитектурные паттерны
+- Storage Layer / Database patterns
+- API structure / Endpoints
 
 #### 📝 Git & Documentation
 - Commit message format
@@ -231,17 +223,18 @@ def load_prompt(name: str, **variables) -> str:
 2. **Без воды** — только нужная информация
 3. **Без англицизмов** — естественный язык, технические термины OK
 4. **Для портфолио** — показываем решённые вызовы и метрики
-5. **Jinja2 для промптов** — индустриальный стандарт
-6. **Версионируем промпты** — они в git, меняются как код
+5. **Актуальность** — документация обновляется вместе с кодом
+6. **Тестируемость** — проверяем ссылки, примеры, команды
 
 ---
 
 ## Начни
 
-1. Создай README.md
+1. Создай README.md по структуре выше
 2. Создай docs/CODEBASE_ANALYSIS.md с TL;DR
-3. Если LLM: создай prompts/loader.py и структуру
-4. Создай AGENTS.md
+3. Создай docs/TESTING_DOCS.md с чеклистами
+4. Создай AGENTS.md для AI assistants
+5. Протестируй документацию (проверь ссылки, примеры)
 
 После создания покажи мне структуру и попроси review.
 ```
@@ -252,8 +245,8 @@ def load_prompt(name: str, **variables) -> str:
 
 Скопируй:
 1. **Этот промпт целиком** → отправь AI в новом проекте
-2. **prompts/loader.py** → без изменений (универсальный)
-3. **Структуру docs/** → адаптируй под свой проект
+2. **Структуру docs/** → адаптируй под свой проект
+3. **Принципы документации** → применяй в README и docs/
 
 ---
 
