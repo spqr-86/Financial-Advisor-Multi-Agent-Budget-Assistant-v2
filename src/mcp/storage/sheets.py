@@ -30,67 +30,75 @@ class GoogleSheetsStorage(StorageInterface):
         """Initialize Google Sheets storage."""
         self._client: gspread.Client | None = None
         self._spreadsheet: gspread.Spreadsheet | None = None
+        self._connect_lock: asyncio.Lock | None = None
+
+    def _get_connect_lock(self) -> asyncio.Lock:
+        """Get or create connection lock (must be called from async context)."""
+        if self._connect_lock is None:
+            self._connect_lock = asyncio.Lock()
+        return self._connect_lock
 
     async def _run_sync(self, func, *args, **kwargs):
         """Run synchronous function in executor."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, partial(func, *args, **kwargs))
 
     async def _connect(self) -> None:
-        """Connect to Google Sheets."""
-        if self._client is not None:
-            return
+        """Connect to Google Sheets (thread-safe with lock)."""
+        async with self._get_connect_lock():
+            if self._client is not None:
+                return
 
-        try:
-            # Support both file path (local) and JSON string (Cloud Run)
-            credentials_source = settings.credentials_source
+            try:
+                # Support both file path (local) and JSON string (Cloud Run)
+                credentials_source = settings.credentials_source
 
-            if credentials_source.startswith("{"):
-                # JSON string from Secret Manager
-                import json
+                if credentials_source.startswith("{"):
+                    # JSON string from Secret Manager
+                    import json
 
-                creds_dict = json.loads(credentials_source)
-                creds = Credentials.from_service_account_info(
-                    creds_dict,
-                    scopes=SCOPES,
-                )
-                logger.info("Connected to Google Sheets using JSON credentials")
-            else:
-                # File path (local dev)
-                creds = Credentials.from_service_account_file(
-                    credentials_source,
-                    scopes=SCOPES,
-                )
-                logger.info(
-                    f"Connected to Google Sheets using file: {credentials_source}"
-                )
-
-            self._client = gspread.authorize(creds)
-
-            # Find or create spreadsheet
-            if settings.google_sheets_spreadsheet_id:
-                self._spreadsheet = await self._run_sync(
-                    self._client.open_by_key, settings.google_sheets_spreadsheet_id
-                )
-            else:
-                try:
-                    self._spreadsheet = await self._run_sync(
-                        self._client.open, settings.google_sheets_spreadsheet_name
+                    creds_dict = json.loads(credentials_source)
+                    creds = Credentials.from_service_account_info(
+                        creds_dict,
+                        scopes=SCOPES,
                     )
-                except gspread.SpreadsheetNotFound:
+                    logger.info("Connected to Google Sheets using JSON credentials")
+                else:
+                    # File path (local dev)
+                    creds = Credentials.from_service_account_file(
+                        credentials_source,
+                        scopes=SCOPES,
+                    )
                     logger.info(
-                        f"Creating new spreadsheet: "
-                        f"{settings.google_sheets_spreadsheet_name}"
+                        f"Connected to Google Sheets using file: {credentials_source}"
                     )
+
+                self._client = gspread.authorize(creds)
+
+                # Find or create spreadsheet
+                if settings.google_sheets_spreadsheet_id:
                     self._spreadsheet = await self._run_sync(
-                        self._client.create, settings.google_sheets_spreadsheet_name
+                        self._client.open_by_key, settings.google_sheets_spreadsheet_id
                     )
+                else:
+                    try:
+                        self._spreadsheet = await self._run_sync(
+                            self._client.open, settings.google_sheets_spreadsheet_name
+                        )
+                    except gspread.SpreadsheetNotFound:
+                        logger.info(
+                            f"Creating new spreadsheet: "
+                            f"{settings.google_sheets_spreadsheet_name}"
+                        )
+                        self._spreadsheet = await self._run_sync(
+                            self._client.create, settings.google_sheets_spreadsheet_name
+                        )
 
-            logger.info(f"Connected to spreadsheet: {self._spreadsheet.title}")
+                logger.info(f"Connected to spreadsheet: {self._spreadsheet.title}")
 
-        except Exception as e:
-            logger.error(f"Failed to connect to Google Sheets: {e}")
-            raise
+            except Exception as e:
+                logger.error(f"Failed to connect to Google Sheets: {e}")
+                raise
 
     async def _get_worksheet(self) -> gspread.Worksheet:
         """Get the main expenses worksheet."""
@@ -102,7 +110,7 @@ class GoogleSheetsStorage(StorageInterface):
             worksheet = await self._run_sync(
                 self._spreadsheet.worksheet, worksheet_name
             )
-            logger.info(f"Using worksheet: {worksheet_name}")
+            logger.debug(f"Using worksheet: {worksheet_name}")
         except gspread.WorksheetNotFound:
             logger.error(f"Worksheet '{worksheet_name}' not found!")
             raise ValueError(
@@ -121,7 +129,7 @@ class GoogleSheetsStorage(StorageInterface):
             worksheet = await self._run_sync(
                 self._spreadsheet.worksheet, worksheet_name
             )
-            logger.info(f"Using limits worksheet: {worksheet_name}")
+            logger.debug(f"Using limits worksheet: {worksheet_name}")
         except gspread.WorksheetNotFound:
             logger.info(f"Creating limits worksheet: {worksheet_name}")
             worksheet = await self._run_sync(
@@ -202,6 +210,8 @@ class GoogleSheetsStorage(StorageInterface):
 
         Adds to 'Траты и бюджет' worksheet with columns:
         Дата | Категория | Расшифровка | Сумма
+
+        Uses append_row() for atomic operation without race conditions.
         """
         try:
             worksheet = await self._get_worksheet()
@@ -209,38 +219,18 @@ class GoogleSheetsStorage(StorageInterface):
             expense_date = date or datetime.now()
             date_str = expense_date.strftime("%d.%m.%Y")
 
-            # Find the first empty row in column A
-            all_values = await self._run_sync(worksheet.get_all_values)
-
-            # Find first row where column A is empty
-            next_row = len(all_values) + 1
-            for i, row in enumerate(all_values):
-                if not row or not row[0]:
-                    next_row = i + 1
-                    break
-
-            # Append row: Дата, Категория, Расшифровка, Сумма
-            await self._run_sync(
-                worksheet.update,
-                f"A{next_row}:D{next_row}",
-                [[date_str, category, description, amount]],
-            )
-
-            logger.info(
-                f"Added expense for user {user_id}: {category} - {amount}"
-            )
-
-            # Check if limit exceeded (using cached limits + in-memory calculation)
+            # Check limits first (cached, usually no API call)
             limits_result = await self.get_limits(user_id)
             limits = limits_result.get("limits", {})
 
+            # Only read data if we need to check limits for this category
             limit_exceeded = None
             if category in limits:
-                # Calculate from already loaded data (no second API call!)
+                all_values = await self._run_sync(worksheet.get, "A:D")
                 spent_before = self._calculate_month_spent_for_category(
                     all_values, category
                 )
-                spent = spent_before + amount  # Include just added expense
+                spent = spent_before + amount  # Include expense we're about to add
                 limit = limits[category]
                 if spent > limit:
                     limit_exceeded = {
@@ -248,6 +238,17 @@ class GoogleSheetsStorage(StorageInterface):
                         "spent": spent,
                         "limit": limit,
                     }
+
+            # Atomic append - no race condition possible
+            await self._run_sync(
+                worksheet.append_row,
+                [date_str, category, description, amount],
+                value_input_option="USER_ENTERED",
+            )
+
+            logger.info(
+                f"Added expense for user {user_id}: {category} - {amount}"
+            )
 
             return {
                 "status": "success",
@@ -469,20 +470,25 @@ class GoogleSheetsStorage(StorageInterface):
         try:
             worksheet = await self._get_worksheet()
 
-            # Get all rows to find the last one
-            all_values = await self._run_sync(worksheet.get, "A:D")
+            # Read only column A to find row count (optimization: O(n) vs O(n*4))
+            col_a = await self._run_sync(worksheet.get, "A:A")
 
-            if not all_values or len(all_values) <= 1:
+            if not col_a or len(col_a) <= 1:
                 return {
                     "status": "error",
                     "error": "No expenses to delete",
                 }
 
             # Last row number (1-indexed, including header)
-            last_row_number = len(all_values)
-            last_row_data = all_values[-1]
+            last_row_number = len(col_a)
 
-            # Pad row if needed
+            # Read only the last row's data (4 cells instead of entire table)
+            last_row_data = await self._run_sync(
+                worksheet.get, f"A{last_row_number}:D{last_row_number}"
+            )
+
+            # Flatten and pad if needed
+            last_row_data = last_row_data[0] if last_row_data else []
             while len(last_row_data) < 4:
                 last_row_data.append("")
 
@@ -516,7 +522,10 @@ class GoogleSheetsStorage(StorageInterface):
         user_id: str,
         expenses: list[dict],
     ) -> dict[str, Any]:
-        """Add multiple expenses using batch API."""
+        """Add multiple expenses using batch API.
+
+        Uses append_rows() for atomic operation without race conditions.
+        """
         try:
             worksheet = await self._get_worksheet()
 
@@ -545,21 +554,12 @@ class GoogleSheetsStorage(StorageInterface):
                 except Exception as e:
                     errors.append({"index": i, "expense": exp, "error": str(e)})
 
-            # Single API call for all valid rows
+            # Atomic append - no race condition possible
             if rows_to_add:
-                # Find the first empty row in column A efficiently
-                all_values = await self._run_sync(worksheet.get_all_values)
-                next_row = len(all_values) + 1
-                for i, row in enumerate(all_values):
-                    if not row or not row[0]:
-                        next_row = i + 1
-                        break
-
-                end_row = next_row + len(rows_to_add) - 1
-
-                # Using update instead of append_rows to target specific columns A:D
                 await self._run_sync(
-                    worksheet.update, f"A{next_row}:D{end_row}", rows_to_add
+                    worksheet.append_rows,
+                    rows_to_add,
+                    value_input_option="USER_ENTERED",
                 )
 
             logger.info(
