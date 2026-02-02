@@ -216,6 +216,6 @@ Private project — All rights reserved
 
 ## 👨‍💻 Автор
 
-Разработано с помощью Claude (Anthropic) через Claude Code CLI.
+Разработано с помощью Claude (Anthropic).
 
 **Нужна помощь?** Смотрите документацию в `/docs` или troubleshooting в [CLAUDE.md](CLAUDE.md#common-gotchas).
