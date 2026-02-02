@@ -45,6 +45,14 @@ Telegram-бот, который понимает естественный язы
 - **Structured outputs** — Pydantic schemas для валидации AI responses
 - **FSM-based conversations** — state machine для multi-turn диалогов
 
+### Prompt Engineering
+- **Role-based prompts** — специализированные инструкции для каждого агента (Orchestrator, Registrar, Analyst)
+- **Few-shot examples** — примеры в промптах для consistent форматирования (progress bars, emoji)
+- **Dynamic context injection** — categories list, current date, period formats инжектятся в runtime
+- **Tool-use instructions** — детальные guide когда использовать какой tool (execute_analysis_code triggers)
+- **Constraint prompts** — явные запреты ("НЕ симулируй добавление", "ОБЯЗАТЕЛЬНО вызови tool")
+- **Structured outputs** — промпты для генерации HTML formatting, table structures
+
 ### Performance Optimizations
 - **Atomic operations** — `append_row()` вместо read→update для устранения race conditions
 - **Caching** — 60s TTL для budget limits
@@ -233,13 +241,14 @@ gcloud run services logs read budget-bot --limit=50
 
 ## 🎯 Решённые технические вызовы
 
-1. **Race conditions в Google Sheets** — переход с `get→calculate→update` на атомарный `append_row()`
-2. **LLM hallucinations** — structured prompts + tool validation + Pydantic schemas
-3. **Quota management** — dynamic model switching + retry logic с exponential backoff
-4. **State consistency** — FSM для multi-turn диалогов без external state store
-5. **Security в code execution** — sandboxed interpreter с whitelist imports, 10s timeout
-6. **Thread safety** — `asyncio.Lock()` для connection pooling, атомарные операции
-7. **Message length limits** — автоматический split для Telegram's 4096 char limit
+1. **LLM hallucinations & unreliable outputs** — structured prompts с constraint instructions, tool validation, Pydantic schemas
+2. **Multi-step reasoning** — orchestrator-worker pattern с dedicated agents для разных task types
+3. **Context injection** — dynamic prompts с categories/dates/formats, инжекция в runtime
+4. **Race conditions в Google Sheets** — переход с `get→calculate→update` на атомарный `append_row()`
+5. **Quota management** — dynamic model switching + retry logic с exponential backoff
+6. **State consistency** — FSM для multi-turn диалогов без external state store
+7. **Security в code execution** — sandboxed interpreter с whitelist imports, 10s timeout
+8. **Thread safety** — `asyncio.Lock()` для connection pooling, атомарные операции
 
 ---
 
