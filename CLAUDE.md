@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Budget Assistant v2.0** is a Telegram-based AI financial management bot that tracks expenses and provides personalized financial advice. The project uses a microservices architecture with three independent services communicating via HTTP.
 
-**Current Status:** Iteration 13 (Storage Reliability) - Race conditions eliminated with atomic append operations, thread-safe connection with asyncio.Lock(), optimized reads. Previous: Code execution for analytics (Iteration 12), UX/UI with FSM (Iteration 11).
+**Current Status:** Iteration 13+ (Prompt Engineering) - Prompts extracted to Jinja2 templates for easier iteration and portfolio showcase. Previous: Storage reliability (Iteration 13), code execution for analytics (Iteration 12), UX/UI with FSM (Iteration 11).
 
 **Core Functionality:**
 - Accept expense descriptions from users via Telegram ("купил хлеб 50 рублей")
@@ -73,7 +73,10 @@ The project uses **google-adk** (Agent Development Kit) patterns with a root orc
 - Handles complex analytics with code execution (comparisons, trends, anomalies)
 - Tools: `get_expenses_tool`, `get_statistics_tool`, `execute_analysis_code`
 
-**Agent prompts:** Located in `prompts/agents/` (orchestrator.txt, registrar.txt, analyst.txt)
+**Agent prompts:** Jinja2 templates in `prompts/agents/` (orchestrator.j2, registrar.j2, analyst.j2) loaded via `prompts/loader.py` with dynamic variables:
+- `{{ categories }}` - list of expense categories
+- `{{ categories_with_emoji }}` - categories with emoji formatting
+- `{{ current_date }}` - current date for date parsing
 
 **Implementation:** `src/mcp/agents/adk_agents.py` contains the main ADKBudgetAgent class that orchestrates all agents.
 
@@ -114,6 +117,7 @@ AnalystAgent now has `execute_analysis_code` tool for complex queries that can't
 | Multi-Agent Framework | google-adk ^1.20.0 | Agent orchestration (Iteration 7) |
 | Data Storage | gspread ^5.12.0 | Google Sheets API client |
 | Data Analysis | pandas ^2.0.0, numpy ^1.24.0 | DataFrame operations for code execution |
+| Prompt Templates | jinja2 ^3.1.6 | Dynamic prompt rendering with variables |
 | Testing | pytest ^7.4.0, pytest-asyncio ^0.23.0 | Async testing |
 | Linting | ruff ^0.1.0 | Code style checking |
 
@@ -403,7 +407,7 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 ### MCP Service Development
 - **Agent system using google-adk:** All agents defined in `src/mcp/agents/adk_agents.py`
 - **Tools in separate module:** Tool definitions in `src/mcp/agents/tools/sheets.py`
-- **Prompts in files:** Agent instructions loaded from `prompts/agents/*.txt`
+- **Prompts as Jinja2 templates:** Agent instructions in `prompts/agents/*.j2`, loaded via `prompts/loader.py` with dynamic variables (categories, dates, formats). See `prompts/agents/README.md` for prompt engineering techniques.
 - **Storage operations:** Always use `StorageInterface` methods, never direct Google Sheets calls
 - **Model selection:** Use `gemini-2.0-flash` for stable quota. Avoid experimental models like `gemini-2.0-flash-exp` in production (low free-tier quota). Available models: `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-flash-latest`. Check quota errors with 🚨 emoji in logs.
 
@@ -469,7 +473,8 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 | 10 | ✅ | UX/UI Phase 1: Interactive buttons, commands, HTML formatting, emoji categories |
 | 11 | ✅ | UX/UI Phase 2: Structured /add with FSM, reply keyboards, step-by-step flow |
 | 12 | ✅ | Code Execution: execute_analysis_code tool for complex analytics (pandas, numpy) |
-| **13** | **✅** | **Storage Reliability: atomic append, asyncio.Lock, optimized reads, get_running_loop** |
+| 13 | ✅ | Storage Reliability: atomic append, asyncio.Lock, optimized reads, get_running_loop |
+| **13+** | **✅** | **Prompt Engineering: Jinja2 templates, dynamic context injection, easier iteration** |
 
 **Next Focus:** UX/UI Phase 3 - Visualizations (matplotlib charts), budget limits, data export; Production monitoring (Cloud Logging, Error Reporting)
 
@@ -804,6 +809,7 @@ MCP_SSE_PORT=8083
 12. **Graceful shutdown (Iteration 8):** Services handle SIGTERM/SIGINT for Cloud Run. Don't block shutdown in custom code.
 13. **Gemini API quota issues:** If bot times out (30s+) with no response, check MCP logs for quota exceeded errors. **Recommended:** Use `GEMINI_MODEL=gemini-2.0-flash` (15 req/min free tier). **Avoid:** `gemini-2.5-flash` (only 5 req/min). For Cloud Run deployment, use: `gcloud run services update budget-mcp --update-env-vars "GEMINI_MODEL=gemini-2.0-flash" --region us-central1 --project ${GCP_PROJECT_ID}`. See [Cloud Run Operations](docs/CLOUD_RUN_OPERATIONS.md) for details.
 14. **Storage writes (Iteration 13):** Always use `append_row()`/`append_rows()` for adding data to Google Sheets — never `get_all_values()` → calculate row → `update()`. The latter causes race conditions with concurrent requests.
+15. **Prompt changes (Iteration 13+):** After editing prompts in `prompts/agents/*.j2`, restart MCP service for changes to take effect. Prompts are loaded once at startup, not hot-reloaded. For testing, see `docs/CODEBASE_ANALYSIS.md` section "Хочу изменить промпт агента и протестировать".
 
 ## Additional Documentation
 
