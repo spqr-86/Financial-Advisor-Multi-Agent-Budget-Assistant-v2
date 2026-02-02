@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Budget Assistant v2.0** is a Telegram-based AI financial management bot that tracks expenses and provides personalized financial advice. The project uses a microservices architecture with three independent services communicating via HTTP.
 
-**Current Status:** Iteration 11 (UX/UI Phase 2) - Structured /add command with FSM, reply keyboards, and step-by-step expense flow. Phase 1 complete with interactive buttons, commands, and rich formatting. Cloud Run deployment active with full production setup.
+**Current Status:** Iteration 13 (Storage Reliability) - Race conditions eliminated with atomic append operations, thread-safe connection with asyncio.Lock(), optimized reads. Previous: Code execution for analytics (Iteration 12), UX/UI with FSM (Iteration 11).
 
 **Core Functionality:**
 - Accept expense descriptions from users via Telegram ("купил хлеб 50 рублей")
@@ -345,8 +345,13 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 - Worksheet name: "Траты и бюджет"
 - Columns: Дата | Категория | Расшифровка | Сумма
 - Date format: "DD.MM.YYYY"
-- Async wrapping of synchronous gspread calls using executor
+- Async wrapping of synchronous gspread calls using `run_in_executor()` with `get_running_loop()`
 - Lazy connection: connects on first use, reuses connection
+- **Iteration 13 improvements:**
+  - Atomic writes with `append_row()`/`append_rows()` — no race conditions
+  - Thread-safe connection with `asyncio.Lock()` in `_connect()`
+  - Optimized `delete_last_expense()` — reads only column A + last row instead of entire table
+  - Conditional reads in `add_expense()` — skips reading if no limits set for category
 
 ## Request Flow
 
@@ -462,7 +467,9 @@ docker run -p 8080:8080 -e BUDGET_API_URL=http://host.docker.internal:8081 budge
 | 8 | ✅ | Production Polish: timeouts, message splitting, logging, graceful shutdown |
 | 9 | ✅ | Cloud Run Deployment: docker-compose, Secret Manager, deployment scripts |
 | 10 | ✅ | UX/UI Phase 1: Interactive buttons, commands, HTML formatting, emoji categories |
-| **11** | **✅** | **UX/UI Phase 2: Structured /add with FSM, reply keyboards, step-by-step flow** |
+| 11 | ✅ | UX/UI Phase 2: Structured /add with FSM, reply keyboards, step-by-step flow |
+| 12 | ✅ | Code Execution: execute_analysis_code tool for complex analytics (pandas, numpy) |
+| **13** | **✅** | **Storage Reliability: atomic append, asyncio.Lock, optimized reads, get_running_loop** |
 
 **Next Focus:** UX/UI Phase 3 - Visualizations (matplotlib charts), budget limits, data export; Production monitoring (Cloud Logging, Error Reporting)
 
@@ -796,6 +803,7 @@ MCP_SSE_PORT=8083
 11. **Logging best practices (Iteration 8):** Always log user_id, request timing, and use `exc_info=True` for exceptions. Check `src/bot/handlers/__init__.py` for examples.
 12. **Graceful shutdown (Iteration 8):** Services handle SIGTERM/SIGINT for Cloud Run. Don't block shutdown in custom code.
 13. **Gemini API quota issues:** If bot times out (30s+) with no response, check MCP logs for quota exceeded errors. **Recommended:** Use `GEMINI_MODEL=gemini-2.0-flash` (15 req/min free tier). **Avoid:** `gemini-2.5-flash` (only 5 req/min). For Cloud Run deployment, use: `gcloud run services update budget-mcp --update-env-vars "GEMINI_MODEL=gemini-2.0-flash" --region us-central1 --project ${GCP_PROJECT_ID}`. See [Cloud Run Operations](docs/CLOUD_RUN_OPERATIONS.md) for details.
+14. **Storage writes (Iteration 13):** Always use `append_row()`/`append_rows()` for adding data to Google Sheets — never `get_all_values()` → calculate row → `update()`. The latter causes race conditions with concurrent requests.
 
 ## Additional Documentation
 
