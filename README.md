@@ -1,207 +1,221 @@
 # Budget Assistant v2.0
 
-AI-powered Telegram bot for personal finance management using multi-agent architecture and Google Sheets integration.
-
-## Overview
-
-Budget Assistant is an intelligent financial management bot that helps track expenses through natural language conversations in Telegram. It uses Google's Gemini AI with a multi-agent system to understand your spending patterns, categorize expenses automatically, and provide financial insights.
-
-**Key Features:**
-- 💬 Natural language expense tracking ("купил хлеб 50 рублей")
-- 🤖 Multi-agent AI system with specialized agents (Orchestrator, Registrar, Analyst)
-- 📊 Automatic categorization and Google Sheets integration
-- 📈 Expense statistics and analysis
-- 🧮 Complex analytics via LLM-generated code execution (comparisons, trends, anomalies)
-- 🔌 MCP Server for Claude Desktop integration
-- 🔒 User access control
-- ☁️ Cloud-native deployment on Google Cloud Run
-- ⚡ Interactive UI with keyboards, buttons, and rich formatting
-
-## Architecture
-
-The project uses a **microservices architecture** with three independent services:
-
-```
-User (Telegram) → Bot (8080) → API Gateway (8081) → MCP Service (8082) → Google Sheets
-```
-
-- **Telegram Bot** - Handles user interactions, rate limiting, access control
-- **API Gateway** - Routes requests, validates data, handles errors
-- **MCP Service** - Multi-agent AI system, business logic, Google Sheets integration
-
-## Quick Start
-
-### Local Development
-
-```bash
-# Install dependencies
-poetry install
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your tokens
-
-# Run with docker-compose (recommended)
-docker-compose up
-
-# Or run manually (3 terminals)
-poetry run python -m src.mcp.app       # Terminal 1 (port 8082)
-poetry run python -m src.api.app       # Terminal 2 (port 8081)
-poetry run python -m src.bot.run_polling  # Terminal 3 (polling mode)
-```
-
-### Cloud Run Deployment
-
-```bash
-# Set environment variables
-export GCP_PROJECT_ID=your-project
-export GCP_REGION=us-central1
-export TELEGRAM_BOT_TOKEN=your-token
-export GOOGLE_API_KEY=your-api-key
-export WEBHOOK_SECRET=your-secret
-export GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
-
-# Deploy all services
-./scripts/deploy_all.sh
-```
-
-## Documentation
-
-- **[CLAUDE.md](CLAUDE.md)** - Complete developer guide and architecture overview
-- **[MCP Server](docs/MCP_SERVER.md)** - Claude Desktop integration guide
-- **[Cloud Run Operations](docs/CLOUD_RUN_OPERATIONS.md)** - Production operations guide
-- **[Google Cloud Setup](docs/GOOGLE_CLOUD_SETUP.md)** - Cloud deployment instructions
-- **[Testing Guide](docs/TESTING.md)** - Testing strategies and procedures
-
-## MCP Server (Claude Desktop)
-
-Budget Assistant can be used directly from Claude Desktop via MCP protocol:
-
-```bash
-# Run MCP server for Claude Desktop
-./scripts/run_mcp_stdio.sh
-```
-
-Configure in `~/Library/Application Support/Claude/claude_desktop_config.json`:
-```json
-{
-  "mcpServers": {
-    "budget-assistant": {
-      "command": "/path/to/budget-assistant-v2/scripts/run_mcp_stdio.sh",
-      "cwd": "/path/to/budget-assistant-v2"
-    }
-  }
-}
-```
-
-See [MCP Server docs](docs/MCP_SERVER.md) for details.
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|-----------|
-| Bot Framework | aiogram 3.4+ |
-| Web Framework | FastAPI 0.115+ |
-| AI Framework | google-adk 1.20+ (Agent Development Kit) |
-| AI Model | Google Gemini (gemini-2.0-flash) |
-| Data Analysis | pandas, numpy (for code execution sandbox) |
-| MCP Server | fastmcp 2.0+ (Claude Desktop integration) |
-| Storage | Google Sheets via gspread |
-| Deployment | Google Cloud Run + Secret Manager |
-| Testing | pytest + pytest-asyncio |
-
-## Project Status
-
-**Current**: Iteration 12 - Code Execution for Complex Analytics
-
-- ✅ Microservices architecture (3 services)
-- ✅ Multi-agent AI system with google-adk
-- ✅ Google Sheets integration
-- ✅ Cloud Run deployment with Docker
-- ✅ Secret Manager integration
-- ✅ Production polish (timeouts, logging, graceful shutdown)
-- ✅ Interactive UI (keyboards, buttons, HTML formatting, FSM)
-- ✅ MCP Server for Claude Desktop integration
-- ✅ Code execution for complex analytics (pandas/numpy sandbox)
-- 🔄 Monitoring and visualizations (Phase 3)
-
-## Requirements
-
-- Python 3.11+
-- Poetry for dependency management
-- Docker & docker-compose (for local dev)
-- Google Cloud Project (for production)
-- Telegram Bot Token
-- Google Gemini API Key
-- Google Service Account with Sheets access
-
-## Testing
-
-```bash
-# Run all tests
-poetry run pytest
-
-# With coverage report
-poetry run pytest --cov=src --cov-report=html
-
-# Current coverage: 55.66% (56 tests passing)
-```
-
-## Environment Variables
-
-### Required for all environments:
-- `TELEGRAM_BOT_TOKEN` - Telegram bot token from BotFather
-- `GOOGLE_API_KEY` - Gemini API key
-- `GOOGLE_APPLICATION_CREDENTIALS` - Path to service account JSON
-- `GOOGLE_SHEETS_SPREADSHEET_ID` - Google Sheets spreadsheet ID
-
-### Local development:
-- `BUDGET_API_URL=http://localhost:8081`
-- `MCP_API_URL=http://localhost:8082`
-
-### Production (Cloud Run):
-- `GCP_PROJECT_ID` - Google Cloud project ID
-- `GCP_REGION` - Cloud Run region (default: us-central1)
-- `WEBHOOK_SECRET` - Random secret for webhook validation
-
-See `.env.example` for complete list.
-
-## Common Operations
-
-### View logs (Cloud Run)
-```bash
-gcloud run services logs read budget-mcp --project=${GCP_PROJECT_ID} --region=${GCP_REGION} --limit=50
-```
-
-### Change Gemini model
-```bash
-gcloud run services update budget-mcp --update-env-vars "GEMINI_MODEL=gemini-2.0-flash" --project=${GCP_PROJECT_ID} --region=${GCP_REGION}
-```
-
-### Check health
-```bash
-curl https://budget-bot-*.run.app/health
-```
-
-See [Cloud Run Operations Guide](docs/CLOUD_RUN_OPERATIONS.md) for more commands.
-
-## Contributing
-
-This is a personal project, but suggestions and feedback are welcome!
-
-1. Check [CLAUDE.md](CLAUDE.md) for development guidelines
-2. Follow the existing code style (ruff formatting)
-3. Add tests for new features
-4. Maintain 50%+ test coverage
-
-## License
-
-Private project - All rights reserved
-
-## Author
-
-Developed with assistance from Claude (Anthropic) using Claude Code CLI.
+**Telegram-бот для учёта расходов с AI и Google Sheets**
 
 ---
 
-**Need help?** Check the documentation in `/docs` or see troubleshooting section in CLAUDE.md.
+## 🤔 Что это?
+
+Telegram-бот, который понимает естественный язык и автоматически записывает ваши расходы в Google Sheets.
+
+**Напишите:** `купил хлеб 50 рублей`
+**Бот поймёт:** категория "Еда", сумма 50₽, описание "хлеб"
+**Результат:** запись в таблице + статистика по кнопке
+
+---
+
+## 💡 Зачем?
+
+✅ **Не нужно заполнять формы** — просто пишите как думаете
+✅ **AI сам определяет категорию** — из 17 предустановленных
+✅ **Данные в вашем Google Sheets** — полный контроль
+✅ **Статистика и аналитика** — за день/неделю/месяц, сравнение периодов
+✅ **Бюджетные лимиты** — предупреждения при превышении
+✅ **Работает из Claude Desktop** — через MCP протокол
+
+**Идеально для:** личных финансов, семейного бюджета, учёта мелких трат
+
+---
+
+## 🚀 Как быстро запустить?
+
+### Вариант 1: Локально (для разработки)
+
+```bash
+# 1. Клонировать и установить зависимости
+git clone <repo-url>
+cd budget-assistant-v2
+poetry install
+
+# 2. Настроить .env файл
+cp .env.example .env
+# Заполнить: TELEGRAM_BOT_TOKEN, GOOGLE_API_KEY, путь к service-account.json
+
+# 3. Запустить всё одной командой
+docker-compose up
+```
+
+**Готово!** Бот работает в режиме polling (без webhook).
+
+### Вариант 2: В облаке (Google Cloud Run)
+
+```bash
+# Деплой трёх сервисов + автоматическая настройка webhook
+export GCP_PROJECT_ID=your-project
+export TELEGRAM_BOT_TOKEN=xxx
+export GOOGLE_API_KEY=xxx
+# ... (см. .env.example для полного списка)
+
+./scripts/deploy_all.sh
+```
+
+**Готово!** Бот работает 24/7 в облаке.
+
+---
+
+## 📱 Как использовать?
+
+### Основные команды
+
+| Команда | Что делает |
+|---------|-----------|
+| `/start` | Приветствие и главное меню |
+| `/add` | Структурированное добавление расхода (шаг за шагом) |
+| `/stats` | Статистика за неделю/месяц/год |
+| `/last` | Последние 5 расходов |
+| `/delete` | Удалить последний расход |
+| `/help` | Справка по командам |
+
+### Примеры естественного языка
+
+```
+# Простое добавление
+"кофе 150"
+"такси 300 рублей"
+"ВкусВилл 2468,36"
+
+# С датой
+"вчера обед 500"
+"01.02 кино 800"
+
+# Несколько расходов сразу
+"ВкусВилл 2468 и Ozon 679 и такси 300"
+
+# Статистика
+"покажи расходы за январь"
+"сколько потратил на еду в феврале"
+"самый большой расход за месяц"
+```
+
+### Интерактивные кнопки
+
+После каждого действия бот показывает кнопки:
+- ➕ **Еще один расход** — быстро добавить следующий
+- 📊 **Статистика** — посмотреть расходы
+- ❌ **Отменить** — удалить последнюю запись
+- 🏠 **В меню** — вернуться к главному меню
+
+---
+
+## 📚 Куда идти дальше?
+
+### Для пользователей
+
+- **[Быстрый старт с Claude Desktop](docs/CLAUDE_DESKTOP_CONFIG.md)** — используйте бот прямо из Claude
+- **[MCP Server](docs/MCP_SERVER.md)** — интеграция с Claude Desktop
+- **[Примеры использования](CLAUDE.md#bot-command-handlers-iteration-10)** — все возможности бота
+
+### Для разработчиков
+
+| Документ | Описание |
+|----------|----------|
+| **[CLAUDE.md](CLAUDE.md)** | 📖 Полное руководство по архитектуре и разработке |
+| **[docs/CODEBASE_ANALYSIS.md](docs/CODEBASE_ANALYSIS.md)** | 🔍 Анализ кодовой базы для новичков (на русском) |
+| **[docs/TESTING.md](docs/TESTING.md)** | 🧪 Тестирование и CI/CD |
+| **[docs/CLOUD_RUN_OPERATIONS.md](docs/CLOUD_RUN_OPERATIONS.md)** | ☁️ Операции в продакшене |
+| **[docs/UX_UI_DESIGN.md](docs/UX_UI_DESIGN.md)** | 🎨 UX/UI паттерны и клавиатуры |
+
+### Быстрая диагностика проблем
+
+**Бот не отвечает:**
+```bash
+# Проверить логи (если локально)
+docker-compose logs -f bot
+
+# Проверить логи (если Cloud Run)
+gcloud run services logs read budget-bot --limit=50
+```
+
+**AI тупит / долго думает:**
+- Проверьте квоту Gemini API (в Cloud Console)
+- Смените модель: `GEMINI_MODEL=gemini-2.0-flash` (больше лимит)
+
+**Ошибки с Google Sheets:**
+- Убедитесь что service account имеет права на таблицу (Editor)
+- Проверьте что `GOOGLE_SHEETS_SPREADSHEET_ID` правильный
+
+---
+
+## 🏗 Архитектура (кратко)
+
+```
+Пользователь → Telegram → Bot (8080) → API Gateway (8081) → MCP (8082) → Google Sheets
+                                                                ↓
+                                                         AI Agents (Gemini)
+```
+
+**3 независимых сервиса:**
+1. **Bot** — обработка Telegram, UI, кнопки
+2. **API** — маршрутизация, валидация
+3. **MCP** — AI агенты, бизнес-логика, Google Sheets
+
+**Multi-Agent система:**
+- **Orchestrator** — понимает намерение пользователя
+- **Registrar** — добавляет/удаляет расходы
+- **Analyst** — показывает статистику, выполняет аналитику
+
+---
+
+## 🛠 Технологии
+
+| Компонент | Технология |
+|-----------|-----------|
+| Bot | aiogram 3.4+ |
+| API | FastAPI 0.115+ |
+| AI | Google Gemini + google-adk 1.20+ |
+| Storage | Google Sheets (gspread) |
+| Analytics | pandas, numpy (sandbox для кода) |
+| MCP | fastmcp 2.0+ |
+| Deploy | Google Cloud Run, Secret Manager |
+| Tests | pytest, 81 passing tests |
+
+---
+
+## 📈 Статус проекта
+
+**Текущая итерация:** 13 (Storage Reliability)
+
+- ✅ Микросервисная архитектура (3 сервиса)
+- ✅ Multi-agent AI система (Orchestrator, Registrar, Analyst)
+- ✅ Интеграция с Google Sheets (атомарные операции, без race conditions)
+- ✅ Деплой в Google Cloud Run
+- ✅ Интерактивный UI (кнопки, клавиатуры, FSM)
+- ✅ MCP Server для Claude Desktop
+- ✅ Выполнение Python-кода для сложной аналитики
+- ✅ Бюджетные лимиты с предупреждениями
+- 🔄 **Дальше:** визуализации (графики), экспорт данных, мониторинг
+
+---
+
+## 🤝 Участие в проекте
+
+Это личный проект, но фидбек и предложения приветствуются!
+
+1. Изучите [CLAUDE.md](CLAUDE.md) — там все гайдлайны
+2. Соблюдайте стиль кода (ruff formatting)
+3. Добавляйте тесты для новых фич
+4. Поддерживайте покрытие тестами ≥50%
+
+---
+
+## 📄 Лицензия
+
+Private project — All rights reserved
+
+---
+
+## 👨‍💻 Автор
+
+Разработано с помощью Claude (Anthropic) через Claude Code CLI.
+
+**Нужна помощь?** Смотрите документацию в `/docs` или troubleshooting в [CLAUDE.md](CLAUDE.md#common-gotchas).
